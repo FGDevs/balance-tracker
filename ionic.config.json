@@ -1,0 +1,7 @@
+{
+  "name": "BalanceTracker",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
