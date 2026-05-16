@@ -1,0 +1,239 @@
+<ion-router-outlet></ion-router-outlet>
+
+<!-- Floating tab bar -->
+<nav
+  class="fixed inset-x-0 bottom-0 z-30 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none transition-all duration-300 ease-out"
+  [class.opacity-0]="!showBar()"
+  [class.translate-y-full]="!showBar()"
+  aria-label="Navigasi utama"
+>
+  <div class="relative max-w-md mx-auto pointer-events-auto">
+
+    <!-- Backdrop tap-catcher when fab menu is open (closes on outside tap) -->
+    @if (fabExpanded()) {
+      <button
+        type="button"
+        class="fixed inset-0 z-0 bg-hero/20 backdrop-blur-[2px] cursor-default"
+        (click)="closeFabMenu()"
+        aria-label="Tutup menu"
+      ></button>
+    }
+
+    <!-- The pill bar -->
+    <div
+      class="relative bg-card rounded-full shadow-[0_12px_32px_-12px_rgba(61,36,24,0.28)] h-16 flex items-center justify-around px-2 border border-ink/5"
+    >
+      <!-- Dashboard -->
+      <a
+        routerLink="/dashboard"
+        class="relative flex items-center justify-center w-12 h-12 transition-colors"
+        [class.text-ink]="activeTab() === 'dashboard'"
+        [class.text-ink-muted]="activeTab() !== 'dashboard'"
+        aria-label="Beranda"
+      >
+        <svg
+          class="w-[22px] h-[22px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 12l9-9 9 9" />
+          <path d="M5 10v10h4v-6h6v6h4V10" />
+        </svg>
+        @if (activeTab() === 'dashboard') {
+          <span
+            class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent"
+          ></span>
+        }
+      </a>
+
+      <!-- Accounts -->
+      <a
+        routerLink="/accounts"
+        class="relative flex items-center justify-center w-12 h-12 transition-colors"
+        [class.text-ink]="activeTab() === 'accounts'"
+        [class.text-ink-muted]="activeTab() !== 'accounts'"
+        aria-label="Akun"
+      >
+        <svg
+          class="w-[22px] h-[22px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="2" y="7" width="20" height="13" rx="2" />
+          <path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+          <circle cx="17" cy="14" r="1.4" />
+        </svg>
+        @if (activeTab() === 'accounts') {
+          <span
+            class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent"
+          ></span>
+        }
+      </a>
+
+      <!-- Center spacer for FAB -->
+      <span class="w-16 shrink-0" aria-hidden="true"></span>
+
+      <!-- Transactions -->
+      <a
+        routerLink="/transactions"
+        class="relative flex items-center justify-center w-12 h-12 transition-colors"
+        [class.text-ink]="activeTab() === 'transactions'"
+        [class.text-ink-muted]="activeTab() !== 'transactions'"
+        aria-label="Transaksi"
+      >
+        <svg
+          class="w-[22px] h-[22px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M7 4l-4 4 4 4" />
+          <path d="M3 8h14" />
+          <path d="M17 20l4-4-4-4" />
+          <path d="M21 16H7" />
+        </svg>
+        @if (activeTab() === 'transactions') {
+          <span
+            class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent"
+          ></span>
+        }
+      </a>
+
+      <!-- Profile -->
+      <a
+        routerLink="/profile"
+        class="relative flex items-center justify-center w-12 h-12 transition-colors"
+        [class.text-ink]="activeTab() === 'profile'"
+        [class.text-ink-muted]="activeTab() !== 'profile'"
+        aria-label="Profil"
+      >
+        <svg
+          class="w-[22px] h-[22px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21a8 8 0 0 1 16 0" />
+        </svg>
+        @if (activeTab() === 'profile') {
+          <span
+            class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent"
+          ></span>
+        }
+      </a>
+    </div>
+
+    <!-- Long-press fab list (expands upward from FAB) -->
+    <div
+      class="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+0.75rem)] flex flex-col items-center gap-2.5 transition-all duration-200 ease-out"
+      [class.opacity-0]="!fabExpanded()"
+      [class.opacity-100]="fabExpanded()"
+      [class.translate-y-2]="!fabExpanded()"
+      [class.pointer-events-none]="!fabExpanded()"
+    >
+      <button
+        type="button"
+        (click)="goToNewCategory()"
+        class="rounded-full bg-card shadow-card px-4 py-2.5 flex items-center gap-2 text-sm font-semibold text-ink active:scale-[0.97] transition"
+      >
+        <svg
+          class="w-4 h-4 text-chip-amber-ink"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M20.5 12.5L12 21l-9-9V3h9z" />
+          <circle cx="7.5" cy="7.5" r="1.5" />
+        </svg>
+        Kategori
+      </button>
+      <button
+        type="button"
+        (click)="goToCalculator()"
+        class="rounded-full bg-card shadow-card px-4 py-2.5 flex items-center gap-2 text-sm font-semibold text-ink active:scale-[0.97] transition"
+      >
+        <svg
+          class="w-4 h-4 text-chip-sky-ink"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="4" y="3" width="16" height="18" rx="2" />
+          <line x1="8" y1="7" x2="16" y2="7" />
+          <line x1="8" y1="12" x2="9" y2="12" />
+          <line x1="12" y1="12" x2="13" y2="12" />
+          <line x1="8" y1="16" x2="9" y2="16" />
+          <line x1="12" y1="16" x2="13" y2="16" />
+          <line x1="16" y1="12" x2="16" y2="16" />
+        </svg>
+        Kalkulator
+      </button>
+      <button
+        type="button"
+        (click)="goToNewTransaction()"
+        class="rounded-full bg-card shadow-card px-4 py-2.5 flex items-center gap-2 text-sm font-semibold text-ink active:scale-[0.97] transition"
+      >
+        <svg
+          class="w-4 h-4 text-chip-green-ink"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+          />
+          <circle cx="16" cy="12" r="1.6" />
+        </svg>
+        Transaksi
+      </button>
+    </div>
+
+    <!-- Center FAB (protrudes above bar) -->
+    <button
+      type="button"
+      (click)="onFabClick()"
+      (pointerdown)="onFabPress()"
+      (pointerup)="onFabRelease()"
+      (pointerleave)="onFabRelease()"
+      (pointercancel)="onFabRelease()"
+      class="absolute left-1/2 -translate-x-1/2 -top-6 w-16 h-16 rounded-full bg-accent text-on-dark shadow-[0_10px_28px_-6px_rgba(217,122,60,0.55)] flex items-center justify-center transition-transform duration-200 ease-out active:scale-95"
+      [class.rotate-45]="fabExpanded()"
+      aria-label="Aksi cepat"
+    >
+      <svg
+        class="w-7 h-7"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.25"
+        stroke-linecap="round"
+      >
+        <path d="M12 5v14 M5 12h14" />
+      </svg>
+    </button>
+  </div>
+</nav>

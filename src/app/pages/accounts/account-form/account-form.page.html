@@ -1,0 +1,448 @@
+<ion-content [fullscreen]="true">
+  <div class="min-h-full bg-app font-sans pb-12">
+
+    <!-- Compact editorial hero with back button -->
+    <section
+      class="relative overflow-hidden bg-hero text-on-dark px-6 pt-8 pb-12 rounded-b-3xl"
+    >
+      <div
+        class="pointer-events-none absolute -top-20 -right-16 w-64 h-64 rounded-full bg-accent/15 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-accent-warm/10 blur-3xl"
+      ></div>
+
+      <div class="relative max-w-md mx-auto">
+        <button
+          type="button"
+          (click)="goBack()"
+          class="inline-flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-on-dark hover:bg-on-dark/10 active:scale-95 transition"
+          aria-label="Kembali"
+        >
+          <svg
+            class="w-5 h-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+
+        <div class="flex items-center gap-3 mt-4">
+          <span class="block h-px w-6 bg-accent-warm"></span>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+          >
+            {{ isEdit() ? 'Edit akun' : 'Akun baru' }}
+          </p>
+        </div>
+
+        <h1 class="font-display text-[2.4rem] leading-[1.05] mt-4 max-w-xs">
+          @if (isEdit()) {
+            Ubah <span class="italic text-accent-warm">kantong</span>.
+          } @else {
+            Tambah <span class="italic text-accent-warm">kantong</span> baru.
+          }
+        </h1>
+      </div>
+    </section>
+
+    @if (loading()) {
+      <div class="flex justify-center py-16">
+        <span
+          class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"
+        ></span>
+      </div>
+    } @else {
+      <form
+        (submit)="submit($event)"
+        class="px-5 mt-6 max-w-md mx-auto flex flex-col gap-4"
+        novalidate
+      >
+
+        <!-- IDENTITAS -->
+        <section class="bg-card rounded-2xl shadow-card p-6">
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+          >
+            Identitas
+          </p>
+
+          <div class="mt-4 flex flex-col gap-4">
+            <label class="flex flex-col gap-1.5">
+              <span
+                class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+              >
+                Nama
+              </span>
+              <input
+                type="text"
+                autocomplete="off"
+                placeholder="mis. BCA Tabungan"
+                [value]="name()"
+                (input)="name.set(asValue($event))"
+                class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+
+            <div>
+              <span
+                class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+              >
+                Jenis akun
+              </span>
+              @if (isEdit()) {
+                <div class="mt-2 inline-flex items-center gap-2 rounded-xl bg-app px-3 py-2.5">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 text-ink-soft"
+                  >
+                    <svg
+                      class="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.75"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="3" y="6" width="18" height="13" rx="2" />
+                      <line x1="3" y1="11" x2="21" y2="11" />
+                    </svg>
+                  </span>
+                  <span class="text-sm font-semibold text-ink">
+                    {{ typeLabel() }}
+                  </span>
+                  <span class="text-[11px] text-ink-muted ml-1">
+                    &middot; tidak bisa diubah
+                  </span>
+                </div>
+              } @else {
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                  @for (option of typeOptions; track option.value) {
+                    <button
+                      type="button"
+                      (click)="selectType(option.value)"
+                      class="flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition border"
+                      [class.bg-ink]="type() === option.value"
+                      [class.text-on-dark]="type() === option.value"
+                      [class.border-ink]="type() === option.value"
+                      [class.bg-app]="type() !== option.value"
+                      [class.text-ink-soft]="type() !== option.value"
+                      [class.border-transparent]="type() !== option.value"
+                    >
+                      <svg
+                        class="w-4 h-4 shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.75"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        @switch (option.value) {
+                          @case ('cash') {
+                            <path
+                              d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                            />
+                            <circle cx="16" cy="12" r="1.4" />
+                          }
+                          @case ('bank') {
+                            <path
+                              d="M3 21h18 M3 10h18 M5 10v11 M9 10v11 M15 10v11 M19 10v11 M12 3l9 7H3z"
+                            />
+                          }
+                          @case ('credit') {
+                            <rect x="2" y="6" width="20" height="13" rx="2" />
+                            <line x1="2" y1="11" x2="22" y2="11" />
+                          }
+                          @case ('savings') {
+                            <polyline points="3 17 9 11 13 15 21 7" />
+                            <polyline points="14 7 21 7 21 14" />
+                          }
+                        }
+                      </svg>
+                      {{ option.label }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+
+            <label class="flex flex-col gap-1.5">
+              <span
+                class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+              >
+                Mata uang
+              </span>
+              <div class="flex items-center gap-3">
+                <input
+                  type="text"
+                  maxlength="3"
+                  [value]="currencyCode()"
+                  (input)="currencyCode.set(asValue($event).toUpperCase())"
+                  [disabled]="isEdit()"
+                  class="w-24 rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink uppercase tracking-wider focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+                />
+                <p class="text-xs text-ink-muted">
+                  Kode 3 huruf, mis. IDR / USD
+                </p>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <!-- SALDO (create only) -->
+        @if (!isEdit()) {
+          <section class="bg-card rounded-2xl shadow-card p-6">
+            <p
+              class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+            >
+              {{ isCredit() ? 'Utang saat ini' : 'Saldo awal' }}
+            </p>
+
+            <div class="relative mt-4">
+              <span
+                class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-muted text-sm font-semibold pointer-events-none"
+              >
+                Rp
+              </span>
+              <input
+                type="number"
+                inputmode="decimal"
+                placeholder="0"
+                [value]="balance()"
+                (input)="balance.set(asNumber($event))"
+                class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-4 py-3 text-ink font-display text-xl placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+
+            @if (isCredit()) {
+              <p class="text-xs text-ink-muted mt-3 leading-relaxed">
+                Tulis sebagai <span class="font-semibold">angka negatif</span>
+                (mis. -1500000) karena kartu kredit menyimpan utang.
+              </p>
+            }
+          </section>
+        }
+
+        <!-- DETAIL KARTU KREDIT -->
+        @if (isCredit()) {
+          <section class="bg-card rounded-2xl shadow-card p-6">
+            <p
+              class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+            >
+              Detail kartu kredit
+            </p>
+
+            <div class="mt-4 flex flex-col gap-4">
+              <label class="flex flex-col gap-1.5">
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+                >
+                  Limit kredit
+                </span>
+                <div class="relative">
+                  <span
+                    class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-muted text-sm font-semibold pointer-events-none"
+                  >
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    inputmode="decimal"
+                    placeholder="0"
+                    [value]="creditLimit()"
+                    (input)="creditLimit.set(asNumber($event))"
+                    class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </div>
+              </label>
+
+              <div class="grid grid-cols-2 gap-3">
+                <label class="flex flex-col gap-1.5">
+                  <span
+                    class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+                  >
+                    Tgl cetak
+                  </span>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="31"
+                    placeholder="1–31"
+                    [value]="statementDay()"
+                    (input)="statementDay.set(asNumber($event))"
+                    class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </label>
+
+                <label class="flex flex-col gap-1.5">
+                  <span
+                    class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+                  >
+                    Tgl tempo
+                  </span>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="31"
+                    placeholder="1–31"
+                    [value]="paymentDueDay()"
+                    (input)="paymentDueDay.set(asNumber($event))"
+                    class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </label>
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- WARNA -->
+        <section class="bg-card rounded-2xl shadow-card p-6">
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+          >
+            Warna penanda
+          </p>
+
+          <div class="flex flex-wrap gap-3 mt-4">
+            @for (preset of colorPresets; track preset) {
+              <button
+                type="button"
+                (click)="selectColor(preset)"
+                [style.background-color]="preset"
+                class="relative w-10 h-10 rounded-full transition active:scale-90"
+                [class.ring-2]="color() === preset"
+                [class.ring-ink]="color() === preset"
+                [class.ring-offset-2]="color() === preset"
+                [class.ring-offset-card]="color() === preset"
+                [attr.aria-label]="'Pilih warna ' + preset"
+                [attr.aria-pressed]="color() === preset"
+              ></button>
+            }
+          </div>
+        </section>
+
+        @if (errorMessage()) {
+          <p
+            class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug"
+          >
+            {{ errorMessage() }}
+          </p>
+        }
+
+        <!-- ACTIONS -->
+        <div class="flex flex-col gap-2 mt-2">
+          <button
+            type="submit"
+            [disabled]="!canSubmit() || saving() || deleting()"
+            class="rounded-xl bg-accent text-on-dark font-semibold px-5 py-3.5 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+          >
+            @if (saving()) {
+              <span
+                class="inline-block w-4 h-4 border-2 border-on-dark/40 border-t-on-dark rounded-full animate-spin"
+              ></span>
+              <span>Menyimpan&hellip;</span>
+            } @else {
+              <span>{{ isEdit() ? 'Simpan perubahan' : 'Buat akun' }}</span>
+            }
+          </button>
+
+          @if (isEdit()) {
+            <button
+              type="button"
+              (click)="openDeleteConfirm()"
+              [disabled]="saving() || deleting()"
+              class="rounded-xl bg-card shadow-card text-chip-coral-ink font-semibold px-5 py-3.5 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              @if (deleting()) {
+                <span
+                  class="inline-block w-4 h-4 border-2 border-chip-coral-ink/30 border-t-chip-coral-ink rounded-full animate-spin"
+                ></span>
+                <span>Menghapus&hellip;</span>
+              } @else {
+                <svg
+                  class="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                </svg>
+                <span>Hapus akun</span>
+              }
+            </button>
+          }
+        </div>
+      </form>
+    }
+  </div>
+
+  <!-- Delete confirmation sheet -->
+  <ion-modal
+    [isOpen]="showDeleteConfirm()"
+    (didDismiss)="closeDeleteConfirm()"
+    [breakpoints]="[0, 1]"
+    [initialBreakpoint]="1"
+    handleBehavior="cycle"
+  >
+    <ng-template>
+      <div
+        class="bg-app px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+      >
+        <p
+          class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+        >
+          Konfirmasi
+        </p>
+        <h3 class="font-display text-[1.75rem] leading-tight text-ink mt-2">
+          Hapus
+          <span class="italic text-chip-coral-ink">akun</span>?
+        </h3>
+        <p class="text-sm text-ink-soft mt-3 leading-relaxed">
+          Akun akan disembunyikan, tetapi semua transaksi tetap tersimpan
+          dalam catatan.
+        </p>
+
+        <div class="flex flex-col gap-2 mt-6">
+          <button
+            type="button"
+            (click)="onConfirmDelete()"
+            class="rounded-xl bg-chip-coral-ink text-on-dark font-semibold px-5 py-3.5 active:scale-[0.98] transition flex items-center justify-center gap-2"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            </svg>
+            Ya, hapus
+          </button>
+          <button
+            type="button"
+            (click)="closeDeleteConfirm()"
+            class="rounded-xl bg-transparent text-ink border border-ink/15 font-medium px-5 py-3.5 active:scale-[0.99] transition"
+          >
+            Batal
+          </button>
+        </div>
+      </div>
+    </ng-template>
+  </ion-modal>
+</ion-content>

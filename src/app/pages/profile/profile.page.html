@@ -1,0 +1,116 @@
+<ion-content [fullscreen]="true">
+  <div class="min-h-full bg-app font-sans pb-32">
+
+    <!-- Hero -->
+    <section
+      class="relative overflow-hidden bg-hero text-on-dark px-6 pt-12 pb-12 rounded-b-3xl"
+    >
+      <div
+        class="pointer-events-none absolute -top-20 -right-16 w-64 h-64 rounded-full bg-accent/15 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-accent-warm/10 blur-3xl"
+      ></div>
+
+      <div class="absolute top-10 right-6 flex flex-col items-end gap-1.5">
+        <span class="block w-1.5 h-1.5 rounded-full bg-accent-warm"></span>
+        <span class="block w-1 h-1 rounded-full bg-on-dark-soft/60"></span>
+        <span class="block w-1 h-1 rounded-full bg-accent/60"></span>
+      </div>
+
+      <div class="relative max-w-md mx-auto">
+        <div class="flex items-center gap-3">
+          <span class="block h-px w-6 bg-accent-warm"></span>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+          >
+            {{ editionLabel() }}
+          </p>
+        </div>
+
+        <h1 class="font-display text-[2.4rem] leading-[1.05] mt-5 max-w-xs">
+          Halo,
+          <span class="italic text-accent-warm">{{ firstName() }}</span>.
+        </h1>
+
+        <p class="font-display italic text-on-dark-soft text-sm mt-3">
+          Catatanmu, ruangmu sendiri.
+        </p>
+      </div>
+    </section>
+
+    <div class="px-5 mt-6 max-w-md mx-auto flex flex-col gap-4">
+
+      <!-- Identity card -->
+      <div class="bg-card rounded-2xl shadow-card p-6">
+        <p
+          class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+        >
+          Identitas
+        </p>
+
+        <div class="mt-4 flex flex-col gap-4">
+          <div class="flex items-start justify-between gap-4">
+            <span class="text-sm text-ink-soft pt-0.5">Nama</span>
+            <span
+              class="font-display text-base text-ink text-right break-words"
+            >
+              {{ displayName() }}
+            </span>
+          </div>
+          <div class="h-px bg-ink/10"></div>
+          <div class="flex items-start justify-between gap-4">
+            <span class="text-sm text-ink-soft pt-0.5">Email</span>
+            <span class="text-sm text-ink text-right break-all">
+              {{ email() }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sign out -->
+      <button
+        type="button"
+        (click)="signOut()"
+        [disabled]="signingOut()"
+        class="rounded-2xl bg-card shadow-card p-4 flex items-center justify-center gap-2 text-chip-coral-ink font-semibold active:scale-[0.99] transition disabled:opacity-60"
+      >
+        @if (signingOut()) {
+          <span
+            class="inline-block w-4 h-4 border-2 border-chip-coral-ink/30 border-t-chip-coral-ink rounded-full animate-spin"
+          ></span>
+          <span>Memproses&hellip;</span>
+        } @else {
+          <svg
+            class="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span>Keluar dari akun</span>
+        }
+      </button>
+
+      @if (errorMessage()) {
+        <p
+          class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug text-center"
+        >
+          {{ errorMessage() }}
+        </p>
+      }
+
+      <p
+        class="font-display italic text-center text-xs text-ink-muted mt-4"
+      >
+        Balance Tracker &middot; v1
+      </p>
+    </div>
+  </div>
+</ion-content>

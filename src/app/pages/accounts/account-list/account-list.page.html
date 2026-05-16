@@ -1,0 +1,208 @@
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="onRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="min-h-full bg-app font-sans pb-32">
+
+    <!-- Hero -->
+    <section
+      class="relative overflow-hidden bg-hero text-on-dark px-6 pt-12 pb-24 rounded-b-3xl"
+    >
+      <div
+        class="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-accent/15 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-20 -left-16 w-60 h-60 rounded-full bg-accent-warm/10 blur-3xl"
+      ></div>
+
+      <div class="absolute top-10 left-6 flex items-center gap-1.5">
+        <span class="block w-1.5 h-1.5 rounded-full bg-accent-warm"></span>
+        <span class="block w-1 h-1 rounded-full bg-on-dark-soft/60"></span>
+        <span class="block w-1 h-1 rounded-full bg-accent/60"></span>
+      </div>
+
+      <div class="relative max-w-md mx-auto">
+        <div class="flex items-center gap-3">
+          <span class="block h-px w-6 bg-accent-warm"></span>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+          >
+            Akun &middot; {{ accounts().length }} aktif
+          </p>
+        </div>
+
+        <h1 class="font-display text-[2.4rem] leading-[1.05] mt-5 max-w-xs">
+          Daftar
+          <span class="italic text-accent-warm">kantong</span>.
+        </h1>
+
+        <div class="flex items-end justify-between gap-4 mt-4">
+          <p class="font-display italic text-on-dark-soft text-sm max-w-[14rem]">
+            Tiap akun, satu cerita.
+          </p>
+          <button
+            type="button"
+            (click)="onAdd()"
+            class="shrink-0 rounded-full bg-accent text-on-dark text-sm font-semibold pl-3 pr-4 py-2 flex items-center gap-1.5 shadow-[0_6px_18px_-6px_rgba(217,122,60,0.6)] active:scale-[0.97] transition"
+          >
+            <svg
+              class="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            >
+              <path d="M12 5v14 M5 12h14" />
+            </svg>
+            Tambah
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Overlap region: totals / empty / loading -->
+    <div class="px-5 -mt-16 relative z-10">
+      @if (loading() && accounts().length === 0) {
+        <div class="bg-card rounded-2xl shadow-card p-6 max-w-md mx-auto">
+          <div class="h-3 w-32 rounded-full bg-ink/10 animate-pulse"></div>
+          <div class="h-9 w-48 rounded-full bg-ink/10 animate-pulse mt-3"></div>
+          <div class="h-px bg-ink/10 my-5"></div>
+          <div class="h-3 w-40 rounded-full bg-ink/10 animate-pulse"></div>
+        </div>
+      } @else if (accounts().length === 0) {
+        <div class="bg-card rounded-2xl shadow-card p-7 text-center max-w-md mx-auto">
+          <div
+            class="mx-auto mb-4 w-12 h-12 rounded-2xl bg-chip-cream-bg flex items-center justify-center text-chip-cream-ink"
+          >
+            <svg
+              class="w-6 h-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+              />
+              <circle cx="16" cy="12" r="1.6" />
+            </svg>
+          </div>
+          <p class="font-display text-lg text-ink">Belum ada akun.</p>
+          <p
+            class="text-sm text-ink-soft mt-1.5 max-w-[18rem] mx-auto leading-relaxed"
+          >
+            Tambah akun pertama untuk mulai mencatat saldo dan transaksi.
+          </p>
+          <button
+            type="button"
+            (click)="onAdd()"
+            class="inline-block mt-5 rounded-xl bg-accent text-on-dark font-semibold text-sm px-5 py-3 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition"
+          >
+            Buat akun
+          </button>
+        </div>
+      } @else {
+        <div class="bg-card rounded-2xl shadow-card p-6 sm:p-7 max-w-md mx-auto">
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+          >
+            Tersedia seluruh akun
+          </p>
+          <p
+            class="font-display text-[2.5rem] leading-none text-ink mt-2 break-words"
+          >
+            {{ totalAvailable() | currencyFormat: primaryCurrency() }}
+          </p>
+
+          <div class="h-px bg-ink/10 my-5"></div>
+
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-sm text-ink-soft">Aktual saldo</span>
+              <span class="font-display text-base text-ink">
+                {{ totalActual() | currencyFormat: primaryCurrency() }}
+              </span>
+            </div>
+
+            @if (totalReserved() > 0) {
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm text-ink-soft">Ditahan kartu kredit</span>
+                <span
+                  class="inline-flex items-center gap-1.5 rounded-full bg-chip-amber-bg text-chip-amber-ink text-xs font-semibold px-3 py-1"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  {{ totalReserved() | currencyFormat: primaryCurrency() }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Loading skeleton for grouped cards -->
+    @if (loading() && accounts().length === 0) {
+      <section class="px-5 mt-10 max-w-md mx-auto">
+        <div class="h-3 w-24 rounded-full bg-ink/10 animate-pulse"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+          @for (n of [1, 2, 3, 4]; track n) {
+            <div
+              class="h-44 rounded-2xl bg-card shadow-card animate-pulse"
+            ></div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Grouped accounts -->
+    @if (!loading() && accounts().length > 0) {
+      <section class="px-5 mt-10 max-w-md mx-auto">
+        @for (group of grouped(); track group.type; let isFirst = $first) {
+          <div [class.mt-8]="!isFirst">
+            <div class="flex items-end justify-between mb-3">
+              <p
+                class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+              >
+                {{ group.label }} &middot; {{ group.accounts.length }}
+              </p>
+              <span class="block h-px flex-1 bg-ink/10 ml-4 mb-1.5"></span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              @for (acc of group.accounts; track acc.id) {
+                <app-account-card
+                  [account]="acc"
+                  (cardClick)="onCardClick($event)"
+                />
+              }
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    @if (errorMessage()) {
+      <p
+        class="mx-5 mt-5 max-w-md md:mx-auto rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug text-center"
+      >
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+</ion-content>

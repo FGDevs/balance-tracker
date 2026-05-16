@@ -1,0 +1,11 @@
+<div class="flex flex-col">
+  <span class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold">
+    Tersedia
+  </span>
+  <span class="font-display text-2xl text-ink mt-1 break-words">
+    {{ available() | currencyFormat: currency() }}
+  </span>
+  <span class="text-xs text-ink-soft mt-1">
+    Aktual: {{ actual() | currencyFormat: currency() }}
+  </span>
+</div>

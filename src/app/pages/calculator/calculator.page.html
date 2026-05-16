@@ -1,0 +1,380 @@
+<ion-content [fullscreen]="true">
+  <div class="min-h-full bg-app font-sans pb-44">
+
+    <!-- Hero -->
+    <section
+      class="relative overflow-hidden bg-hero text-on-dark px-5 pt-10 pb-8 rounded-b-3xl"
+    >
+      <div
+        class="pointer-events-none absolute -top-20 -right-16 w-64 h-64 rounded-full bg-accent/15 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-chip-sky-bg/10 blur-3xl"
+      ></div>
+
+      <div class="relative max-w-md mx-auto">
+        <div class="flex items-center justify-between">
+          <button
+            type="button"
+            (click)="goBack()"
+            class="inline-flex items-center gap-1.5 text-on-dark-soft text-sm font-medium active:opacity-70 transition"
+            aria-label="Kembali"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            Kembali
+          </button>
+          <span class="block w-1.5 h-1.5 rounded-full bg-accent-warm"></span>
+        </div>
+
+        <div class="mt-7">
+          <div class="flex items-center gap-2.5">
+            <span class="block h-px w-5 bg-accent-warm"></span>
+            <p
+              class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+            >
+              Alat bantu
+            </p>
+          </div>
+          <h1 class="font-display text-[2.4rem] leading-[1.05] mt-3">
+            Kalkulator
+            <span class="italic text-accent-warm">cepat.</span>
+          </h1>
+          <p class="font-display italic text-on-dark-soft text-sm mt-3">
+            Pilih transaksi, lihat selisihnya.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters card -->
+    <div class="px-5 -mt-4 relative z-10">
+      <div
+        class="bg-card rounded-2xl shadow-card p-5 max-w-md mx-auto space-y-5"
+      >
+        <!-- Akun -->
+        <div>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-3"
+          >
+            Akun
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              (click)="pickAllAccounts()"
+              [class]="isAllAccounts()
+                ? 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-ink text-on-dark'
+                : 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-transparent text-ink border border-ink/15'"
+            >
+              Semua
+            </button>
+            @for (a of accounts(); track a.id) {
+              <button
+                type="button"
+                (click)="toggleAccount(a.id)"
+                [class]="isAccountSelected(a.id)
+                  ? 'rounded-full px-4 py-1.5 text-sm font-medium transition truncate max-w-[10rem] bg-ink text-on-dark'
+                  : 'rounded-full px-4 py-1.5 text-sm font-medium transition truncate max-w-[10rem] bg-transparent text-ink border border-ink/15'"
+              >
+                {{ a.name }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Tanggal -->
+        <div>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-3"
+          >
+            Tanggal
+          </p>
+          <div class="flex flex-wrap gap-2">
+            @for (p of presets; track p.value) {
+              <button
+                type="button"
+                (click)="pickPreset(p.value)"
+                [class]="datePreset() === p.value
+                  ? 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-ink text-on-dark'
+                  : 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-transparent text-ink border border-ink/15'"
+              >
+                {{ p.label }}
+              </button>
+            }
+          </div>
+
+          @if (datePreset() === 'custom') {
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <label class="flex flex-col gap-1">
+                <span
+                  class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+                >
+                  Dari
+                </span>
+                <input
+                  type="date"
+                  [value]="dateFrom()"
+                  (change)="onDateFromChange($any($event.target).value)"
+                  class="rounded-xl bg-card border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+              <label class="flex flex-col gap-1">
+                <span
+                  class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+                >
+                  Sampai
+                </span>
+                <input
+                  type="date"
+                  [value]="dateTo()"
+                  (change)="onDateToChange($any($event.target).value)"
+                  class="rounded-xl bg-card border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+            </div>
+          } @else {
+            <p class="font-display italic text-xs text-ink-muted mt-3">
+              {{ dateFrom() }} &ndash; {{ dateTo() }}
+            </p>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Cap banner -->
+    @if (capReached()) {
+      <div class="px-5 mt-5 max-w-md mx-auto">
+        <div
+          class="bg-chip-amber-bg text-chip-amber-ink rounded-2xl px-4 py-3 text-sm leading-snug flex items-start gap-3"
+        >
+          <svg
+            class="w-4 h-4 shrink-0 mt-0.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>
+            <span class="font-semibold">Hasil dipotong di 500.</span>
+            Persempit filter untuk hasil yang lebih akurat.
+          </span>
+        </div>
+      </div>
+    }
+
+    <!-- List -->
+    <section class="px-5 mt-7 max-w-md mx-auto">
+      <div class="flex items-center justify-between mb-3 gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="block h-px w-4 bg-accent"></span>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
+          >
+            Transaksi &middot; {{ transactions().length }}
+          </p>
+        </div>
+        @if (transactions().length > 0) {
+          <button
+            type="button"
+            (click)="toggleSelectAll()"
+            class="text-xs font-semibold text-accent active:opacity-70 transition"
+          >
+            {{ allVisibleSelected() ? 'Lepas semua' : 'Pilih semua' }}
+          </button>
+        }
+      </div>
+
+      @if (loading()) {
+        <div class="bg-card rounded-2xl shadow-card p-8 flex justify-center">
+          <span
+            class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"
+          ></span>
+        </div>
+      } @else if (errorMessage()) {
+        <p
+          class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug"
+        >
+          {{ errorMessage() }}
+        </p>
+      } @else if (transactions().length === 0) {
+        <div class="bg-card rounded-2xl shadow-card p-7 text-center">
+          <div
+            class="mx-auto mb-4 w-12 h-12 rounded-2xl bg-chip-cream-bg flex items-center justify-center text-chip-cream-ink"
+          >
+            <svg
+              class="w-6 h-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+          </div>
+          <p class="font-display text-lg text-ink">
+            Tidak ada transaksi pada filter ini.
+          </p>
+          <p
+            class="text-sm text-ink-soft mt-1.5 max-w-[18rem] mx-auto leading-relaxed"
+          >
+            Coba ubah akun atau rentang tanggal.
+          </p>
+        </div>
+      } @else {
+        <div class="bg-card rounded-2xl shadow-card overflow-hidden">
+          @for (tx of transactions(); track tx.id) {
+            <button
+              type="button"
+              (click)="toggleRow(tx.id)"
+              [class]="isSelected(tx.id)
+                ? 'w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-ink/5 last:border-b-0 transition bg-app/40'
+                : 'w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-ink/5 last:border-b-0 transition'"
+              [attr.aria-pressed]="isSelected(tx.id)"
+            >
+              <!-- checkbox -->
+              <span
+                [class]="isSelected(tx.id)
+                  ? 'shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition bg-accent border-accent'
+                  : 'shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition bg-card border-ink/25'"
+              >
+                @if (isSelected(tx.id)) {
+                  <svg
+                    class="w-3 h-3 text-on-dark"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                }
+              </span>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="text-sm font-medium text-ink truncate">
+                    {{ tx.category?.name ?? 'Tanpa kategori' }}
+                  </p>
+                  @if (tx.reserved_from_account_id) {
+                    <span
+                      class="shrink-0 inline-flex items-center rounded-full bg-chip-amber-bg text-chip-amber-ink text-[10px] font-semibold px-2 py-0.5 tracking-wide"
+                    >
+                      reservasi
+                    </span>
+                  }
+                </div>
+                <p class="text-xs text-ink-muted mt-0.5 truncate">
+                  {{ tx.date }}
+                  @if (tx.account?.name) {
+                    &middot; {{ tx.account?.name }}
+                  }
+                </p>
+              </div>
+
+              <span
+                class="shrink-0 font-display text-base"
+                [class.text-chip-green-ink]="tx.type === 'income'"
+                [class.text-chip-coral-ink]="tx.type === 'expense'"
+              >
+                {{ tx.type === 'income' ? '+' : '−' }}
+                {{ tx.amount | currencyFormat: currency() }}
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+  </div>
+
+  <!-- Sticky total bar -->
+  @if (transactions().length > 0) {
+    <div
+      class="fixed inset-x-0 bottom-0 z-30 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none"
+    >
+      <div
+        class="relative max-w-md mx-auto pointer-events-auto bg-hero text-on-dark rounded-2xl shadow-[0_12px_32px_-12px_rgba(61,36,24,0.45)] px-5 py-4"
+      >
+        <div class="flex items-end justify-between gap-4">
+          <div class="min-w-0">
+            <p
+              class="text-[10px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+            >
+              {{ selectedIds().size }} dipilih
+            </p>
+            <p class="font-display italic text-xs text-on-dark-soft mt-1">
+              Masuk
+              <span class="not-italic font-semibold text-on-dark">
+                {{ totalIncome() | currencyFormat: currency() }}
+              </span>
+              &middot; Keluar
+              <span class="not-italic font-semibold text-on-dark">
+                {{ totalExpense() | currencyFormat: currency() }}
+              </span>
+            </p>
+          </div>
+          <div class="text-right shrink-0">
+            <p
+              class="text-[10px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+            >
+              Net
+            </p>
+            <p
+              class="font-display text-2xl mt-1 leading-none break-words"
+              [class.text-chip-green-bg]="netSign() === 'pos'"
+              [class.text-chip-coral-bg]="netSign() === 'neg'"
+              [class.text-on-dark]="netSign() === 'zero'"
+            >
+              {{ net() | currencyFormat: currency() }}
+            </p>
+          </div>
+        </div>
+
+        @if (selectedIds().size > 0) {
+          <button
+            type="button"
+            (click)="clearAllSelection()"
+            class="mt-3 text-xs font-semibold text-accent-warm active:opacity-70 transition inline-flex items-center gap-1.5"
+          >
+            <svg
+              class="w-3 h-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            </svg>
+            Bersihkan pilihan
+          </button>
+        }
+      </div>
+    </div>
+  }
+</ion-content>

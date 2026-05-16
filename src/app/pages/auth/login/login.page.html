@@ -1,0 +1,179 @@
+<ion-content [fullscreen]="true">
+  <div class="min-h-full flex flex-col bg-app font-sans">
+
+    <!-- Hero -->
+    <section
+      class="relative overflow-hidden bg-hero text-on-dark px-6 pt-14 pb-24 rounded-b-3xl"
+    >
+      <!-- decorative ambient glow -->
+      <div
+        class="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-accent/15 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-16 -left-12 w-56 h-56 rounded-full bg-accent-warm/10 blur-3xl"
+      ></div>
+
+      <!-- editorial corner marks -->
+      <div class="absolute top-10 right-6 flex flex-col items-end gap-1.5">
+        <span class="block w-1.5 h-1.5 rounded-full bg-accent-warm"></span>
+        <span class="block w-1 h-1 rounded-full bg-on-dark-soft/60"></span>
+        <span class="block w-1 h-1 rounded-full bg-accent/60"></span>
+      </div>
+
+      <div class="relative max-w-md mx-auto">
+        <div class="flex items-center gap-3">
+          <span class="block h-px w-6 bg-accent-warm"></span>
+          <p
+            class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
+          >
+            Balance Tracker &middot; 01
+          </p>
+        </div>
+
+        <h1
+          class="font-display text-[2.6rem] leading-[1.05] mt-5 max-w-xs"
+        >
+          @if (mode() === 'signin') {
+            Selamat
+            <span class="italic text-accent-warm">kembali</span>.
+          } @else {
+            Mulai
+            <span class="italic text-accent-warm">catatan</span> baru.
+          }
+        </h1>
+
+        <p class="text-on-dark-soft text-sm mt-4 max-w-xs leading-relaxed">
+          @if (mode() === 'signin') {
+            Lacak saldo nyata dan tersedia di setiap kantong.
+          } @else {
+            Daftar untuk mulai menyusun akun pertamamu.
+          }
+        </p>
+      </div>
+    </section>
+
+    <!-- Card overlaps hero edge -->
+    <div class="px-5 -mt-14 relative z-10 flex-1 flex flex-col">
+      <div
+        class="bg-card rounded-2xl shadow-card p-6 sm:p-7 max-w-md w-full mx-auto"
+      >
+        <!-- Mode segment (plain HTML pill tabs) -->
+        <div class="flex gap-1 p-1 bg-app rounded-full mb-6">
+          <button
+            type="button"
+            (click)="setMode('signin')"
+            class="flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors"
+            [class.bg-ink]="mode() === 'signin'"
+            [class.text-on-dark]="mode() === 'signin'"
+            [class.text-ink-soft]="mode() !== 'signin'"
+          >
+            Masuk
+          </button>
+          <button
+            type="button"
+            (click)="setMode('signup')"
+            class="flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors"
+            [class.bg-ink]="mode() === 'signup'"
+            [class.text-on-dark]="mode() === 'signup'"
+            [class.text-ink-soft]="mode() !== 'signup'"
+          >
+            Daftar
+          </button>
+        </div>
+
+        <form (submit)="submit($event)" class="flex flex-col gap-4">
+          @if (mode() === 'signup') {
+            <label class="flex flex-col gap-1.5">
+              <span
+                class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+              >
+                Nama
+              </span>
+              <input
+                type="text"
+                autocomplete="name"
+                placeholder="Nama panggilan"
+                [value]="name()"
+                (input)="name.set(asValue($event))"
+                class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+          }
+
+          <label class="flex flex-col gap-1.5">
+            <span
+              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+            >
+              Email
+            </span>
+            <input
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              placeholder="kamu@email.com"
+              [value]="email()"
+              (input)="email.set(asValue($event))"
+              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1.5">
+            <span
+              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+            >
+              Kata sandi
+            </span>
+            <input
+              type="password"
+              placeholder="Minimal 6 karakter"
+              [autocomplete]="
+                mode() === 'signin' ? 'current-password' : 'new-password'
+              "
+              [value]="password()"
+              (input)="password.set(asValue($event))"
+              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+          </label>
+
+          @if (errorMessage()) {
+            <div
+              class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          @if (infoMessage()) {
+            <div
+              class="rounded-xl bg-chip-green-bg text-chip-green-ink text-sm px-4 py-3 leading-snug"
+            >
+              {{ infoMessage() }}
+            </div>
+          }
+
+          <button
+            type="submit"
+            [disabled]="loading() || !canSubmit()"
+            class="mt-2 rounded-xl bg-accent text-on-dark font-semibold px-5 py-3.5 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+          >
+            @if (loading()) {
+              <span
+                class="inline-block w-4 h-4 border-2 border-on-dark/40 border-t-on-dark rounded-full animate-spin"
+              ></span>
+              <span>Memproses&hellip;</span>
+            } @else {
+              <span>{{ mode() === 'signin' ? 'Masuk' : 'Buat akun' }}</span>
+            }
+          </button>
+        </form>
+      </div>
+
+      <!-- Editorial tagline -->
+      <p
+        class="font-display italic text-center text-sm text-ink-muted mt-10 mb-8"
+      >
+        catatan keuangan, dengan rasa.
+      </p>
+    </div>
+  </div>
+</ion-content>

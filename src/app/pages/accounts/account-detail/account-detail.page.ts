@@ -1,0 +1,333 @@
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
+import { Location } from '@angular/common';
+import { Router } from '@angular/router';
+import {
+  IonContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
+  IonModal,
+  IonRefresher,
+  IonRefresherContent,
+} from '@ionic/angular/standalone';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { AccountService } from '../../../core/services/account.service';
+import { TransactionService } from '../../../core/services/transaction.service';
+import { AccountType, ReservationEntry, Transaction } from '../../../core/models';
+import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
+
+const TYPE_LABEL: Record<AccountType, string> = {
+  cash: 'Tunai',
+  bank: 'Bank',
+  credit: 'Kartu Kredit',
+  savings: 'Tabungan',
+};
+
+type MutasiFilter = 'all' | 'non-reserved' | 'reserved';
+
+interface DateGroup {
+  date: string;
+  label: string;
+  items: Transaction[];
+}
+
+@Component({
+  selector: 'app-account-detail',
+  standalone: true,
+  imports: [
+    IonContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
+    IonModal,
+    IonRefresher,
+    IonRefresherContent,
+    CurrencyFormatPipe,
+  ],
+  templateUrl: './account-detail.page.html',
+})
+export class AccountDetailPage {
+  private readonly accountService = inject(AccountService);
+  private readonly transactionService = inject(TransactionService);
+  private readonly router = inject(Router);
+  private readonly location = inject(Location);
+
+  readonly id = input.required<string>();
+  readonly accountId = computed(() => Number(this.id()));
+
+  readonly loading = signal(false);
+  readonly txLoading = signal(false);
+  readonly unsettledLoading = signal(false);
+  readonly reservationsOpen = signal(false);
+  readonly deleting = signal(false);
+  readonly showDeleteConfirm = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+
+  readonly transactions = signal<Transaction[]>([]);
+  readonly unsettled = signal<ReservationEntry[]>([]);
+  readonly page = signal(0);
+  readonly hasMore = signal(true);
+  readonly mutasiFilter = signal<MutasiFilter>('all');
+
+  readonly hasAnyReserved = computed(() =>
+    this.transactions().some((tx) => tx.reserved_from_account_id != null),
+  );
+
+  readonly filteredTransactions = computed(() => {
+    const f = this.mutasiFilter();
+    const rows = this.transactions();
+    if (f === 'all') return rows;
+    if (f === 'reserved')
+      return rows.filter((tx) => tx.reserved_from_account_id != null);
+    return rows.filter((tx) => tx.reserved_from_account_id == null);
+  });
+
+  readonly groupedTransactions = computed<DateGroup[]>(() => {
+    const groups: DateGroup[] = [];
+    let current: DateGroup | null = null;
+    for (const tx of this.filteredTransactions()) {
+      if (!current || current.date !== tx.date) {
+        current = {
+          date: tx.date,
+          label: this.formatGroupDate(tx.date),
+          items: [],
+        };
+        groups.push(current);
+      }
+      current.items.push(tx);
+    }
+    return groups;
+  });
+
+  readonly account = computed(() => {
+    const id = this.accountId();
+    return (
+      this.accountService.allAccounts().find((a) => a.id === id) ??
+      this.accountService.accounts().find((a) => a.id === id)
+    );
+  });
+
+  readonly typeLabel = computed(() => {
+    const a = this.account();
+    return a ? TYPE_LABEL[a.type] : '';
+  });
+
+  readonly debtAmount = computed(() => {
+    const a = this.account();
+    if (!a) return 0;
+    if (a.type === 'credit') {
+      return a.balance < 0 ? Math.abs(a.balance) : 0;
+    }
+    return a.total_reserved > 0 ? a.total_reserved : 0;
+  });
+
+  readonly availableCredit = computed(() => {
+    const a = this.account();
+    if (!a || a.type !== 'credit' || !a.credit_limit) return 0;
+    return a.credit_limit + a.balance;
+  });
+
+  readonly utilizationPct = computed(() => {
+    const a = this.account();
+    if (!a || a.type !== 'credit' || !a.credit_limit) return 0;
+    return Math.round(
+      Math.min(Math.abs(a.balance) / a.credit_limit, 1) * 100,
+    );
+  });
+
+  readonly utilizationLevel = computed(() => {
+    const pct = this.utilizationPct();
+    if (pct >= 90) return 'high' as const;
+    if (pct >= 50) return 'mid' as const;
+    return 'low' as const;
+  });
+
+  constructor() {
+    effect(() => {
+      const id = this.accountId();
+      if (!Number.isFinite(id)) return;
+      void this.bootstrap(id);
+    });
+  }
+
+  goBack(): void {
+    this.location.back();
+  }
+
+  private async bootstrap(id: number): Promise<void> {
+    if (!this.account()) {
+      this.loading.set(true);
+      try {
+        await this.accountService.loadAllAccounts();
+      } finally {
+        this.loading.set(false);
+      }
+    }
+    await Promise.all([this.loadFirstPage(id), this.loadUnsettled(id)]);
+  }
+
+  private async loadFirstPage(id: number): Promise<void> {
+    this.txLoading.set(true);
+    this.page.set(0);
+    try {
+      const rows = await this.transactionService.getByAccount(id, 0);
+      this.transactions.set(rows);
+      this.hasMore.set(rows.length === TransactionService.PAGE_SIZE);
+    } finally {
+      this.txLoading.set(false);
+    }
+  }
+
+  private async loadUnsettled(id: number): Promise<void> {
+    const a = this.account();
+    if (!a || a.total_reserved <= 0) {
+      this.unsettled.set([]);
+      return;
+    }
+    this.unsettledLoading.set(true);
+    try {
+      const rows = await this.transactionService.getUnsettledReservations(id);
+      this.unsettled.set(rows);
+    } finally {
+      this.unsettledLoading.set(false);
+    }
+  }
+
+  async onRefresh(event: CustomEvent): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    try {
+      await this.accountService.loadAllAccounts();
+      await Promise.all([
+        this.loadFirstPage(this.accountId()),
+        this.loadUnsettled(this.accountId()),
+      ]);
+    } finally {
+      (event.target as HTMLIonRefresherElement).complete();
+    }
+  }
+
+  async onInfinite(event: CustomEvent): Promise<void> {
+    const target = event.target as HTMLIonInfiniteScrollElement;
+    try {
+      const next = this.page() + 1;
+      const rows = await this.transactionService.getByAccount(
+        this.accountId(),
+        next,
+      );
+      this.transactions.update((curr) => [...curr, ...rows]);
+      this.page.set(next);
+      this.hasMore.set(rows.length === TransactionService.PAGE_SIZE);
+    } finally {
+      await target.complete();
+    }
+  }
+
+  toggleReservations(): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    this.reservationsOpen.update((v) => !v);
+  }
+
+  setMutasiFilter(filter: MutasiFilter): void {
+    if (this.mutasiFilter() === filter) return;
+    void Haptics.impact({ style: ImpactStyle.Light });
+    this.mutasiFilter.set(filter);
+  }
+
+  isTransferIncoming(tx: Transaction): boolean {
+    return (
+      tx.type === 'transfer' &&
+      tx.transfer_pair_id != null &&
+      tx.transfer_pair_id < tx.id
+    );
+  }
+
+  mutasiPillClass(filter: MutasiFilter): string {
+    const base =
+      'rounded-full px-4 py-1.5 text-sm font-medium whitespace-nowrap transition active:scale-95';
+    return this.mutasiFilter() === filter
+      ? `${base} bg-ink text-on-dark`
+      : `${base} bg-transparent text-ink border border-ink/15`;
+  }
+
+  private formatGroupDate(date: string): string {
+    const d = new Date(date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round(
+      (today.getTime() - d.getTime()) / 86_400_000,
+    );
+    if (diffDays === 0) return 'Hari ini';
+    if (diffDays === 1) return 'Kemarin';
+    const weekday = new Intl.DateTimeFormat('id-ID', {
+      weekday: 'long',
+    }).format(d);
+    const full = new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(d);
+    return `${weekday} · ${full}`;
+  }
+
+  async onSettleDebt(): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Medium });
+    void this.router.navigate(['/settlements/new'], {
+      queryParams: { reservedFrom: this.accountId() },
+    });
+  }
+
+  async onCreateTransaction(): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    void this.router.navigate(['/transactions/new'], {
+      queryParams: { account: this.accountId() },
+    });
+  }
+
+  onTransactionClick(id: number): void {
+    void this.router.navigate(['/transactions', id, 'edit']);
+  }
+
+  onEdit(): void {
+    void this.router.navigate(['/accounts', this.accountId(), 'edit']);
+  }
+
+  openDeleteConfirm(): void {
+    void Haptics.impact({ style: ImpactStyle.Medium });
+    this.showDeleteConfirm.set(true);
+  }
+
+  closeDeleteConfirm(): void {
+    this.showDeleteConfirm.set(false);
+  }
+
+  async onConfirmDelete(): Promise<void> {
+    this.closeDeleteConfirm();
+    await this.deleteAccount();
+  }
+
+  private async deleteAccount(): Promise<void> {
+    const a = this.account();
+    if (!a) return;
+    this.deleting.set(true);
+    this.errorMessage.set(null);
+    try {
+      await this.accountService.softDelete(this.accountId());
+      await this.accountService.loadAccounts();
+      await this.accountService.loadAllAccounts();
+      await Haptics.notification({ type: NotificationType.Success });
+      void this.router.navigate(['/accounts'], { replaceUrl: true });
+    } catch (err) {
+      await Haptics.notification({ type: NotificationType.Error });
+      this.errorMessage.set(
+        err instanceof Error ? err.message : 'Gagal menghapus akun',
+      );
+    } finally {
+      this.deleting.set(false);
+    }
+  }
+}

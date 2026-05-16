@@ -1,2 +1,44 @@
-// For information on how to create your own theme, please refer to:
-// https://ionicframework.com/docs/theming/
+// Design system tokens — see CLAUDE.md §14.
+// Tailwind reads these via `var(--color-*)`; Ionic components inherit via --ion-* mappings.
+
+:root {
+  /* Surfaces */
+  --color-hero:        #3d2418;
+  --color-hero-soft:   #4a2e1d;
+  --color-app:         #faf3ea;
+  --color-card:        #ffffff;
+  --color-banner:      #cc6c3e;
+
+  /* Text */
+  --color-ink:         #2c1810;
+  --color-ink-soft:    #6b4f3a;
+  --color-ink-muted:   #a08570;
+  --color-on-dark:     #fdf9f3;
+  --color-on-dark-soft:#d9c7b3;
+
+  /* Accents */
+  --color-accent:      #d97a3c;
+  --color-accent-warm: #e9b067;
+
+  /* Pastel chip palette */
+  --chip-green-bg:  #dff5e1;  --chip-green-ink:  #2f7a3d;
+  --chip-coral-bg:  #fde2e0;  --chip-coral-ink:  #b54a3c;
+  --chip-sky-bg:    #dde8f4;  --chip-sky-ink:    #3a6a9a;
+  --chip-amber-bg:  #fbe9c9;  --chip-amber-ink:  #9a6a1f;
+  --chip-cream-bg:  #f3e7d3;  --chip-cream-ink:  #6b4f3a;
+
+  /* Map design tokens onto Ionic CSS variables */
+  --ion-color-primary:        var(--color-accent);
+  --ion-color-primary-rgb:    217, 122, 60;
+  --ion-color-primary-contrast: var(--color-on-dark);
+  --ion-color-primary-contrast-rgb: 253, 249, 243;
+  --ion-color-primary-shade:  #bf6b35;
+  --ion-color-primary-tint:   #dd874f;
+
+  --ion-color-success: #2f7a3d;
+  --ion-color-danger:  #b54a3c;
+  --ion-color-warning: #e9b067;
+
+  --ion-background-color: var(--color-app);
+  --ion-text-color:       var(--color-ink);
+}
