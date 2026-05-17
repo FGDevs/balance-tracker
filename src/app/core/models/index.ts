@@ -53,6 +53,7 @@ export interface Transaction {
   settlement_id?: number;
   parent_tx_id?: number;
   transfer_pair_id?: number;
+  sort_index?: number;          // DB NOT NULL; optional at write time (service defaults to Date.now())
   created_at: string;
   category?: Category;
   account?: Account;
@@ -100,4 +101,24 @@ export interface Tag {
   id: number;
   user_id: string;
   name: string;
+}
+
+// One row extracted from a bank screenshot, awaiting user review (see §9 Transaction Import).
+// `note` is prefilled with the LLM's cleaned-up label and is user-editable — it becomes
+// the saved transaction's `note` column verbatim. `rawDescription` is the verbatim text
+// from the screenshot, kept around as read-only "Asli" reference in the review UI.
+// For type='transfer', `transferDirection` is set by the LLM from the screenshot's sign:
+//   'out' → money left the picked account (picked = from, user picks `to`)
+//   'in'  → money entered the picked account (picked = to,   user picks `from`)
+// `transferAccountId` is the user's selection of the other side at review time.
+export interface ImportDraft {
+  date: string;
+  amount: number;
+  type: 'income' | 'expense' | 'transfer';
+  rawDescription: string;
+  note?: string;
+  suggestedCategoryId?: number;
+  transferDirection?: 'in' | 'out';
+  transferAccountId?: number;
+  skip: boolean;
 }

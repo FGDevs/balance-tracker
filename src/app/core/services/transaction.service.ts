@@ -16,6 +16,13 @@ export type TransactionItemInput = Pick<
   position?: number;
 };
 
+// Restricts moveUp/moveDown neighbor search to the same view the user is in.
+// `accountId` matches the Account Detail mutasi list scoping (account_id OR
+// reserved_from_account_id). Omit to swap freely across the same date group.
+export interface ReorderScope {
+  accountId?: number;
+}
+
 const TX_ITEM_SELECT =
   '*, category:categories(*), reserved_from_account:accounts!reserved_from_account_id(*)';
 const TX_PARENT_SELECT =
@@ -37,10 +44,9 @@ export class TransactionService {
       .getClient()
       .from('transactions')
       .select(TX_SELECT)
-      .or(
-        `account_id.eq.${accountId},reserved_from_account_id.eq.${accountId}`,
-      )
+      .eq('account_id', accountId)
       .order('date', { ascending: false })
+      .order('sort_index', { ascending: false })
       .order('id', { ascending: false })
       .range(from, to);
     if (error) throw error;
@@ -55,6 +61,7 @@ export class TransactionService {
       .from('transactions')
       .select(TX_SELECT)
       .order('date', { ascending: false })
+      .order('sort_index', { ascending: false })
       .order('id', { ascending: false })
       .range(from, to);
     if (error) throw error;
@@ -67,6 +74,7 @@ export class TransactionService {
       .from('transactions')
       .select(TX_SELECT)
       .order('date', { ascending: false })
+      .order('sort_index', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -155,6 +163,7 @@ export class TransactionService {
       .gte('date', filters.dateFrom)
       .lte('date', filters.dateTo)
       .order('date', { ascending: false })
+      .order('sort_index', { ascending: false })
       .order('id', { ascending: false })
       .limit(TransactionService.CALCULATOR_CAP);
     if (filters.accountIds !== 'all') {
@@ -201,6 +210,7 @@ export class TransactionService {
         amount,
         category_id: categoryId,
         reserved_from_account_id: reservedFrom,
+        sort_index: stripped.sort_index ?? Date.now(),
       })
       .select()
       .single();
@@ -228,6 +238,7 @@ export class TransactionService {
     amount: number;
     date: string;
     note?: string;
+    sortIndex?: number;
   }): Promise<void> {
     if (params.fromAccountId === params.toAccountId) {
       throw new Error('Source and destination must differ');
@@ -235,6 +246,7 @@ export class TransactionService {
     const userId = this.requireUserId();
     const client = this.supabase.getClient();
 
+    const baseSort = params.sortIndex ?? Date.now();
     const { data: outRow, error: outErr } = await client
       .from('transactions')
       .insert({
@@ -244,6 +256,7 @@ export class TransactionService {
         type: 'transfer',
         date: params.date,
         note: params.note ?? null,
+        sort_index: baseSort,
       })
       .select()
       .single();
@@ -259,6 +272,7 @@ export class TransactionService {
         date: params.date,
         note: params.note ?? null,
         transfer_pair_id: (outRow as Transaction).id,
+        sort_index: baseSort,
       })
       .select()
       .single();
@@ -325,6 +339,7 @@ export class TransactionService {
           type: 'expense',
           date: params.date,
           note: params.note ?? null,
+          sort_index: Date.now(),
         })
         .select()
         .single();
@@ -347,6 +362,7 @@ export class TransactionService {
         type: 'expense',
         date: params.date,
         note: params.note ?? null,
+        sort_index: Date.now(),
       })
       .select()
       .single();
@@ -397,6 +413,77 @@ export class TransactionService {
       .single();
     if (error) throw error;
     return row as Transaction;
+  }
+
+  // Bulk update sort_index for a set of rows. Used by the drag-drop reorder UI
+  // on Save, where local ordering is computed in the page and then committed in
+  // one shot. No-op when the updates array is empty.
+  async setSortIndices(
+    updates: { id: number; sort_index: number }[],
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    const client = this.supabase.getClient();
+    await Promise.all(
+      updates.map(({ id, sort_index }) =>
+        client.from('transactions').update({ sort_index }).eq('id', id),
+      ),
+    );
+  }
+
+  async moveUp(id: number, scope?: ReorderScope): Promise<void> {
+    await this.swapAdjacent(id, 'up', scope);
+  }
+
+  async moveDown(id: number, scope?: ReorderScope): Promise<void> {
+    await this.swapAdjacent(id, 'down', scope);
+  }
+
+  // Swap sort_index with the next/prev row in the same date group. No-op at edges.
+  // Scope restricts the neighbor search to the same view the user is looking at;
+  // currently supports `accountId` for the Account Detail mutasi list (matches
+  // account_id only, same as getByAccount).
+  private async swapAdjacent(
+    id: number,
+    dir: 'up' | 'down',
+    scope?: ReorderScope,
+  ): Promise<void> {
+    const target = await this.getById(id);
+    if (!target) return;
+    const client = this.supabase.getClient();
+    let q = client
+      .from('transactions')
+      .select('id, sort_index')
+      .eq('date', target.date)
+      .neq('id', id);
+    if (scope?.accountId != null) {
+      q = q.eq('account_id', scope.accountId);
+    }
+    const neighbor = dir === 'up'
+      ? await q
+          .gt('sort_index', target.sort_index)
+          .order('sort_index', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : await q
+          .lt('sort_index', target.sort_index)
+          .order('sort_index', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+    if (neighbor.error) throw neighbor.error;
+    const other = neighbor.data as { id: number; sort_index: number } | null;
+    if (!other) return; // already at the edge
+    const { error: e1 } = await client
+      .from('transactions')
+      .update({ sort_index: other.sort_index })
+      .eq('id', target.id);
+    if (e1) throw e1;
+    const { error: e2 } = await client
+      .from('transactions')
+      .update({ sort_index: target.sort_index })
+      .eq('id', other.id);
+    if (e2) throw e2;
   }
 
   async delete(id: number): Promise<void> {

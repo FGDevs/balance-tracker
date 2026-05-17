@@ -51,6 +51,7 @@ export class SettlementService {
     const settlement = sRow as DebtSettlement;
 
     // Real-money transfer: owing → lender. Two paired transfer rows (out / in).
+    const baseSort = Date.now();
     const { data: outRow, error: outErr } = await client
       .from('transactions')
       .insert({
@@ -60,6 +61,7 @@ export class SettlementService {
         type: 'transfer',
         date: params.paymentDate,
         note: 'Debt settlement',
+        sort_index: baseSort,
       })
       .select()
       .single();
@@ -76,6 +78,7 @@ export class SettlementService {
         date: params.paymentDate,
         note: 'Debt settlement',
         transfer_pair_id: outTx.id,
+        sort_index: baseSort,
       })
       .select()
       .single();
@@ -208,6 +211,7 @@ export class SettlementService {
         type: 'expense',
         date: tx.date,
         note: tx.note ?? null,
+        sort_index: tx.sort_index,
       });
       if (i) throw i;
       return;

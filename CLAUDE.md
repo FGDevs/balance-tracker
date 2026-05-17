@@ -24,6 +24,7 @@ A **personal finance balance tracker** mobile app. Core goal: know the **actual 
 | Mobile UI | Ionic 7 (restricted set — see §3) + plain HTML styled with Tailwind |
 | Styling | Tailwind CSS (no component-level CSS files) |
 | State management | Angular Signals (`signal`, `computed`, `effect`) |
+| Drag & drop | `@angular/cdk/drag-drop` (used in transaction reorder mode) |
 | Backend + DB | Supabase (PostgreSQL + Auth + PostgREST) |
 | Native bridge | Capacitor 5 |
 | Deployment | Vercel (frontend) |
@@ -73,6 +74,7 @@ A **personal finance balance tracker** mobile app. Core goal: know the **actual 
 - Dates stored as `DATE` (`'YYYY-MM-DD'` string) for transactions, not TIMESTAMP
 - Use `async/await` — no `.then()/.catch()` chains
 - Export all interfaces from `src/app/core/models/index.ts`
+- Transaction display queries sort by `(date DESC, sort_index DESC, id DESC)`. `sort_index` defaults to `Date.now()` for manual entries; imports assign explicit descending values; settlement remainders copy the original's `sort_index`. FIFO settlement still orders by `(date ASC, id ASC)` — chronology, not user ordering.
 
 ---
 
@@ -89,14 +91,15 @@ src/
 │   │   │   ├── account.service.ts          # CRUD + availableBalance
 │   │   │   ├── transaction.service.ts      # CRUD + reservation logic
 │   │   │   ├── category.service.ts         # CRUD categories
-│   │   │   └── settlement.service.ts       # bulk + partial settlement
+│   │   │   ├── settlement.service.ts       # bulk + partial settlement
+│   │   │   └── bank-import.service.ts      # screenshot → extract-transactions edge fn
 │   │   └── guards/auth.guard.ts            # CanActivateFn
 │   ├── shell/app-shell.component.{ts,html} # bottom tab bar + ion-router-outlet for authed routes
 │   ├── pages/
 │   │   ├── auth/login/
 │   │   ├── dashboard/                      # total + all account cards
 │   │   ├── accounts/{account-list,account-detail,account-form}/
-│   │   ├── transactions/{transaction-list,transaction-form}/
+│   │   ├── transactions/{transaction-list,transaction-form,transaction-import}/
 │   │   ├── settlements/settlement-form/    # bulk pay + partial split UI
 │   │   ├── categories/
 │   │   ├── calculator/                     # tally selected transactions (filters + sticky total)
@@ -106,6 +109,9 @@ src/
 │   └── app.routes.ts
 ├── environments/{environment.ts, environment.prod.ts}  # generated, gitignored
 └── theme/variables.scss                    # Ionic CSS vars + design tokens
+
+supabase/
+└── functions/extract-transactions/         # Deno edge function, Gemini vision call
 ```
 
 ---
@@ -221,7 +227,7 @@ Input: payment_amount, payer_account_id (lender), reserved_from_account_id (owin
           WHERE id = entry.id
          INSERT new transactions row:
            amount = remainder_amount, parent_tx_id = entry.id, settlement_id = NULL,
-           same account_id / reserved_from_account_id / type / date / note / category_id
+           same account_id / reserved_from_account_id / type / date / note / category_id / sort_index
        else:  -- entry.kind = 'item'
          UPDATE transaction_items
             SET amount = settled_portion, settlement_id = settlement.id
@@ -300,6 +306,18 @@ type ItemInput = Omit<TransactionItem,
 getByAccount(accountId: number, page?: number): Promise<Transaction[]>
 getRecent(limit: number): Promise<Transaction[]>
 
+// Bulk-apply new sort_index values. The drag-drop reorder UI batches all
+// changes locally and calls this once on Save. No-op when updates is empty.
+setSortIndices(updates: { id: number; sort_index: number }[]): Promise<void>
+
+// One-shot adjacent swap by `sort_index`. Kept for any future surface that wants
+// immediate persistence (current UI uses drag-drop + setSortIndices instead).
+// `scope.accountId` restricts neighbor search to rows where `account_id` matches
+// (same scoping as getByAccount — payer-side only).
+interface ReorderScope { accountId?: number }
+moveUp(id: number, scope?: ReorderScope): Promise<void>
+moveDown(id: number, scope?: ReorderScope): Promise<void>
+
 // Returns reservation entries — either whole parents (items-absent) or items
 // (items-present). Each entry embeds its parent for context (date, account, note).
 getUnsettledReservations(reservedFromAccountId: number): Promise<ReservationEntry[]>
@@ -316,6 +334,7 @@ createTransfer(params: {
   amount: number;
   date: string;
   note?: string;
+  sortIndex?: number;          // optional; both paired rows share it; defaults to Date.now()
 }): Promise<void>
 
 createReservedExpense(params: {
@@ -378,6 +397,39 @@ update(id: number, data: Partial<Category>): Promise<Category>
 delete(id: number): Promise<void>
 ```
 
+### BankImportService
+```typescript
+// One row extracted from a screenshot, awaiting user review.
+// `note` is prefilled with the LLM's cleaned-up label and is the only editable note
+// surface on the row — it lands verbatim in the saved transaction's `note` column.
+// `rawDescription` is the verbatim screenshot text, surfaced read-only as "Asli".
+// type='transfer' covers rows between the user's own accounts. The LLM infers
+// `transferDirection` from the screenshot's +/- sign; the user picks the
+// other-side account (`transferAccountId`) at review time.
+export interface ImportDraft {
+  date: string;                          // 'YYYY-MM-DD' (LLM resolves "Hari ini"/"Kemarin")
+  amount: number;                        // positive
+  type: 'income' | 'expense' | 'transfer';
+  rawDescription: string;                // verbatim from the screenshot, read-only
+  note: string;                          // editable; prefilled with LLM-cleaned label
+  suggestedCategoryId?: number;          // best-fit (income/expense only)
+  transferDirection?: 'in' | 'out';      // transfer only: 'out' = picked account is source
+  transferAccountId?: number;            // transfer only: user picks at review
+  skip: boolean;                         // user can untick rows on review (defaults false)
+}
+
+extract(params: {
+  imageBlob: Blob;              // user upload; client compresses to <=1600px JPEG q80
+  accountId: number;            // target account (picked before upload)
+}): Promise<ImportDraft[]>
+
+commit(params: {
+  accountId: number;
+  drafts: ImportDraft[];        // already user-edited; skip:true rows are filtered out
+}): Promise<void>               // income/expense → TransactionService.create; transfer → createTransfer
+```
+The `extract-transactions` edge function is the only thing that touches the Gemini API. It returns `ImportDraft[]` with `suggestedCategoryId` resolved against the user's category list (server fetches categories with the user's JWT) and `transferDirection` set for transfer rows. Client never sees the LLM API key.
+
 ---
 
 ## 9. UI Screens & Key Behavior
@@ -402,7 +454,7 @@ delete(id: number): Promise<void>
 ### Tab Bar (mobile shell)
 - Plain HTML floating pill bar fixed at the bottom safe area (`pb-[max(1rem,env(safe-area-inset-bottom))]`); `bg-card`, `rounded-full`, `shadow`, `max-w-md` centered
 - Five slots, left → right: **Dashboard · Accounts · ⊕ Center FAB · Transactions · Profile**
-- The center FAB is accent-orange and protrudes ~24px above the bar; tap → `/transactions/new`, long-press (450ms) → expands a vertical fab list with three pills, ordered top→bottom: Kategori, Kalkulator, Transaksi (closest to the FAB = most frequent). The plus glyph rotates 45° (→ ×) when the menu is open.
+- The center FAB is accent-orange and protrudes ~24px above the bar; tap → `/transactions/new`, long-press (450ms) → expands a vertical fab list with four pills, ordered top→bottom: Kategori, Kalkulator, Impor, Transaksi (closest to the FAB = most frequent; Impor sits adjacent to Transaksi because it's a transaction-creation shortcut). The plus glyph rotates 45° (→ ×) when the menu is open.
 - Active tab uses `text-ink` + a 4px accent dot below the icon; inactive tabs are `text-ink-muted`
 - The bar lives in `AppShellComponent`, which wraps every authed route via Angular nested routing (`{ path: '', component: AppShellComponent, canActivate: [authGuard], children: [...] }`). The login route is outside the shell and never shows the bar.
 - The bar is only shown on top-level routes (`/dashboard`, `/accounts`, `/transactions`, `/profile`). Sub-pages (account-detail, *-form, settlement-form, categories) hide the bar so forms get full screen.
@@ -420,12 +472,13 @@ delete(id: number): Promise<void>
 - If credit account: show `available_credit` and utilization %
 - "Pending reservations" collapsible section listing unsettled reservation **entries** (`ReservationEntry[]`, see §8) against this account. Each entry renders with its amount + category + parent context: for `kind='parent'` entries the row reads like `<category> · <amount>` / secondary `<parent.account.name> · <date>`; for `kind='item'` entries the row reads `<item.category> · <item.amount>` / secondary `dari <parent.account.name> · <date>` so the user sees that this item lives inside a larger cash event.
 - "Settle Debt" CTA button (plain `button` + Tailwind) if `total_reserved > 0`. The CTA opens the Settlement Form pre-filled for this account as the owing party.
-- "Mutasi" list (transactions where this account is the payer) uses `ion-infinite-scroll` (20 per page); list rows are plain HTML + Tailwind
+- "Mutasi" list mirrors a real bank-statement view: only rows where `transactions.account_id = thisAccount` (this account physically paid or received). Reservation rows where this account is the *owing* party (`reserved_from_account_id = thisAccount`, parent- or item-level) are intentionally excluded from Mutasi — they surface only in the "Pending reservations" dropdown above. Uses `ion-infinite-scroll` (20 per page); rows are plain HTML + Tailwind.
 - Rows are grouped by `date` with the same cream-tinted divider band as Transaction List ("Hari ini" / "Kemarin" / `weekday · long-date`). The row's secondary line drops the date (covered by the divider) — only `note` is shown below the title.
-- A pill filter row above the Mutasi list toggles which mutations are shown: `Semua` (default), `Tanpa reservasi`, `Reservasi`. The filter is purely client-side over already-fetched pages — it does not reset pagination, refetch, or alter what `ion-infinite-scroll` pulls. A row counts as "Reservasi" when `transactions.reserved_from_account_id` is set OR any of its items has `reserved_from_account_id` set; "Tanpa reservasi" is the complement.
+- A pill filter row above the Mutasi list toggles which mutations are shown: `Semua` (default), `Tanpa reservasi`, `Reservasi`. The filter is purely client-side over already-fetched pages. Because the list is scoped to `account_id = thisAccount`, the "Reservasi" filter here surfaces lender-side rows — i.e. cases where this account paid the money and another account owes it back. A row counts as "Reservasi" when `transactions.reserved_from_account_id` is set OR any of its items has `reserved_from_account_id` set; "Tanpa reservasi" is the complement.
 - The filter row is hidden when the loaded mutation set is empty OR when no row in the loaded set has any reservation.
 - Mutasi rows reuse the same `reservasi` / `parsial reservasi` chip rule from Transaction List.
 - "Catat transaksi" CTA — full-width accent-orange button rendered directly below the balance broadsheet card. Navigates to `/transactions/new?account=<id>` so the transaction form opens with this account pre-filled. Always visible.
+- **Reorder mode**: a small "Atur urutan" pill sits at the right end of the Mutasi section header (shown only when the list is non-empty). Tapping it forces `mutasiFilter = 'Semua'` (so visible order matches underlying order), hides the filter pills, and enters drag-drop reorder mode via `@angular/cdk/drag-drop` — header swaps to **Batal** + **Simpan**, each row reveals a drag handle to the right of the amount, and date groups become independent `cdkDropList`s (drags locked to y-axis, no cross-date moves). Drops update only page-local state; Simpan reassigns `sort_index` within each dirty date group using that group's existing slot values and persists via `TransactionService.setSortIndices`, then reloads. Because the page only loads transactions matching this account, the slot reuse never touches rows on other accounts on the same date.
 
 ### Transaction Form
 - Full-page route (`/transactions/new`, `/transactions/:id/edit`); the tab bar is hidden so the form gets full screen
@@ -454,6 +507,7 @@ delete(id: number): Promise<void>
 - Rows are grouped by `date`. Each group is preceded by a cream-tinted full-width divider band (`bg-chip-cream-bg text-chip-cream-ink`) showing the weekday + date in `id-ID` long format (e.g. "Senin · 11 Mei 2026"). Today's group is labeled "Hari ini"; yesterday's is "Kemarin"; older dates use the full format. Dividers are derived client-side from the merged paginated list, so a group may grow as more pages load.
 - Pull-to-refresh via `ion-refresher`; pagination via `ion-infinite-scroll` (20 per page)
 - Each row: category/label on the left, amount on the right (color-coded by direction). The row's secondary line shows account · note only — no date (the group divider covers that). Split transactions display a `{n} rincian` chip beside the amount.
+- **Reorder mode**: the hero has an "Atur urutan" pill. While inactive, the list behaves normally. Tapping it enters reorder mode: the pill is replaced by **Batal** + **Simpan** buttons, the rincian chip is hidden, and each row reveals a drag-handle (`⋮⋮` grip) on the right via `@angular/cdk/drag-drop`. Each date group is its own `cdkDropList`; drags are locked to the y-axis and can't cross date groups. Drops mutate page-local state only — Simpan computes new `sort_index` values per dirty date group (reusing that group's existing slot values, sorted descending, assigned to the new row order) and persists everything in one `setSortIndices` call before reloading. Batal restores the snapshot taken on entry. Simpan is disabled until an actual reorder has happened. Tapping a row no longer navigates to edit while in reorder mode.
 - **Reservation chips on the row** (mutually exclusive): `reservasi` (amber) when *all* items reserved OR parent-level reservation set; `parsial reservasi` (amber, distinct text) when *some-but-not-all* items reserved. No chip when nothing is reserved.
 - Tapping the rincian chip toggles an inline expand panel showing each item's category + amount + (if reserved) `→ <owing account>` coral hint + note. Tapping anywhere else on the row navigates to `/transactions/:id/edit`.
 
@@ -468,6 +522,17 @@ delete(id: number): Promise<void>
 - **Sticky bottom bar** — fixed at the bottom safe area, only when the filtered list is non-empty. Shows: count `{n} dipilih`, breakdown `Masuk Rp Y · Keluar Rp Z`, and the headline `Net Rp X` colored green when > 0, coral when < 0, ink when = 0. Net = `SUM(income) − SUM(expense)` over selected rows. Includes a `Bersihkan` ghost button when count > 0.
 - **Cap** — `getForCalculator` returns up to 500 rows. When the cap is reached, an amber banner above the list reads "Hasil dipotong di 500 — persempit filter."
 - **Empty / loading** — same vocabulary as other list pages (cream chip icon for empty, spinner for loading).
+
+### Transaction Import
+- Route `/transactions/import`, sub-page (tab bar hidden). Lazy-loaded.
+- **Entry points**: (a) header CTA on Transaction List ("Impor dari screenshot"); (b) Impor pill in the FAB long-press menu.
+- **Step 1 — Pick account**: plain account-picker listing all non-deleted accounts. Required before file picker is shown.
+- **Step 2 — Upload**: plain `<input type="file" accept="image/*" capture="environment">` (lets mobile choose camera or gallery). Client compresses to ≤1600px wide, JPEG quality 80, using browser-native canvas — no extra library.
+- **Step 3 — Extracting**: full-screen spinner with cream chip; calls `BankImportService.extract()`. Errors surface as a banner (Gemini quota, parse failure, etc.) with a "Coba lagi" button.
+- **Step 4 — Review**: list of draft rows. Each row is a plain HTML card with editable fields: date (`<input type="date">`), amount, type toggle (Masuk/Keluar/Transfer), Catatan (text input prefilled with the LLM-cleaned label — this is the only note surface; it writes verbatim to the saved transaction's `note`), `[ ] Lewati` checkbox. The original screenshot text is shown read-only as "Asli". Income/expense rows show a category select prefilled with `suggestedCategoryId`. Transfer rows show a direction toggle (Keluar ke / Masuk dari, prefilled from `transferDirection`) and an "Akun tujuan/asal" select listing all accounts ≠ the picked import account; commit is blocked until every non-skipped transfer row has its other-side account chosen. A "Pilih semua / Lewati semua" toggle is at the top.
+- **Step 5 — Commit**: sticky bottom bar "Simpan {n} transaksi" → calls `commit()` → on success, navigates to `/transactions` and shows a transient cream toast `{n} transaksi diimpor`. Income/expense rows go through `TransactionService.create`; transfer rows go through `TransactionService.createTransfer` (which writes both paired rows and links them via `transfer_pair_id`). Each draft is assigned an explicit `sort_index = anchor - i` (anchor = `Date.now()` at commit start) so the screenshot's top→bottom order maps to the list's top→bottom within the date group; transfers pass the same value through `createTransfer.sortIndex` so both paired rows share it.
+- **Dedup**: not enforced in v1. Re-uploading the same screenshot inserts duplicate rows.
+- **Splits / per-item reservation**: not supported in import — every imported row is a single-amount transaction. User can edit afterwards via the normal Transaction Form to split.
 
 ### Settlement Form
 - Rendered inside `ion-modal`
@@ -495,6 +560,23 @@ Workflow:
 - The generator exits non-zero if either var is missing — failing the build loudly is intentional.
 
 `SupabaseService` imports `environment` from `src/environments/environment` and exposes a singleton `SupabaseClient` via `getClient()`. No component or other service may call `createClient` directly.
+
+### LLM Vision (bank-screenshot import)
+
+The `extract-transactions` edge function is the only consumer of the LLM API. All keys live in Supabase secrets, never in the Angular bundle.
+
+Required Supabase secrets:
+- `GEMINI_API_KEY` — from Google AI Studio. Free tier works out-of-box (~1,500 image requests/day, 15/min). Paid tier = enable billing on the same Google Cloud project; no code or key change needed.
+- `GEMINI_MODEL` — defaults to `gemini-2.5-flash`. Swap by command: `supabase secrets set GEMINI_MODEL=gemini-2.5-pro` (or any other Gemini vision-capable model). The edge function reads this env var on every request, so changes take effect without redeploy.
+
+The edge function's contract:
+- Accepts `{ image: base64, accountId }` via authenticated POST (JWT in `Authorization` header).
+- Server fetches the user's category list (RLS scopes it automatically) so prompts include only valid category ids.
+- Calls Gemini with a structured-output schema matching `ImportDraft[]` minus `skip` (defaults to false on the client).
+- Prompt includes today's date (so "Hari ini"/"Kemarin" resolves) and the user's category list (so `suggestedCategoryId` lands on an existing id, not a hallucinated one).
+- Returns `ImportDraft[]` or a structured error (`quota_exceeded` / `parse_failed` / `unsupported_image`).
+
+**Privacy note**: Gemini's free tier may use submitted images to improve Google models. Paid tier (any billing-enabled project) does not. For real bank screenshots, switch to paid before going beyond personal dev use.
 
 ---
 

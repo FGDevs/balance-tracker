@@ -74,6 +74,8 @@ CREATE TABLE transactions (
   parent_tx_id             BIGINT        REFERENCES transactions(id), -- self-ref: remainder row
   -- transfer linking
   transfer_pair_id         BIGINT        REFERENCES transactions(id), -- links 2 transfer rows
+  -- user-controlled ordering within a date group; service assigns Date.now() by default
+  sort_index               BIGINT        NOT NULL DEFAULT 0,
   created_at               TIMESTAMP     DEFAULT NOW(),
   CHECK (reserved_from_account_id IS NULL OR reserved_from_account_id <> account_id)
 );
@@ -118,6 +120,7 @@ CREATE TABLE transaction_tags (
 -- 2. INDEXES
 -- ============================================================
 CREATE INDEX idx_tx_user_date        ON transactions(user_id, date DESC);
+CREATE INDEX idx_tx_user_date_sort   ON transactions(user_id, date DESC, sort_index DESC);
 CREATE INDEX idx_tx_account          ON transactions(account_id);
 CREATE INDEX idx_tx_settlement       ON transactions(settlement_id);
 CREATE INDEX idx_tx_reserved         ON transactions(reserved_from_account_id);

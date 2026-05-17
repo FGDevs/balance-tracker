@@ -410,15 +410,50 @@
             </p>
           </div>
           @if (transactions().length > 0) {
-            <span
-              class="font-display italic text-xs text-ink-muted"
-            >
-              terbaru di atas
-            </span>
+            @if (!reorderMode()) {
+              <button
+                type="button"
+                (click)="enterReorderMode()"
+                class="inline-flex items-center gap-1.5 rounded-full bg-app text-ink-soft text-[11px] font-semibold px-3 py-1 active:scale-95 transition"
+              >
+                <svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 6h13 M8 12h13 M8 18h13" />
+                  <path d="M3 6l2-2 2 2 M3 18l2 2 2-2 M5 4v16" />
+                </svg>
+                Atur urutan
+              </button>
+            } @else {
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  (click)="cancelReorder()"
+                  [disabled]="saving()"
+                  class="rounded-full bg-app text-ink-soft text-[11px] font-semibold px-3 py-1 active:scale-95 transition disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  (click)="saveReorder()"
+                  [disabled]="!isDirty() || saving()"
+                  class="rounded-full bg-accent text-on-dark text-[11px] font-semibold px-3 py-1 active:scale-95 transition disabled:opacity-50"
+                >
+                  {{ saving() ? 'Menyimpan…' : 'Simpan' }}
+                </button>
+              </div>
+            }
           }
         </div>
 
-        @if (hasAnyReserved()) {
+        @if (hasAnyReserved() && !reorderMode()) {
           <div
             class="flex gap-2 overflow-x-auto mb-3 -mx-1 px-1 pb-1"
             role="tablist"
@@ -504,11 +539,24 @@
               >
                 {{ group.label }}
               </div>
+              <div
+                cdkDropList
+                [cdkDropListData]="group.items"
+                [cdkDropListDisabled]="!reorderMode()"
+                (cdkDropListDropped)="onDrop($event, group.date)"
+              >
               @for (tx of group.items; track tx.id) {
-                <button
-                  type="button"
+                <div
+                  cdkDrag
+                  [cdkDragDisabled]="!reorderMode()"
+                  cdkDragLockAxis="y"
+                  role="button"
+                  tabindex="0"
                   (click)="onTransactionClick(tx.id)"
-                  class="w-full flex items-start justify-between gap-3 px-5 py-3.5 text-left border-b border-ink/5 active:bg-app/40 transition"
+                  (keydown.enter)="onTransactionClick(tx.id)"
+                  class="w-full flex items-start justify-between gap-3 px-5 py-3.5 text-left border-b border-ink/5 bg-card transition"
+                  [class.cursor-pointer]="!reorderMode()"
+                  [class.active:bg-app\/40]="!reorderMode()"
                 >
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
@@ -540,6 +588,7 @@
                       </p>
                     }
                   </div>
+
                   <span
                     class="shrink-0 font-display text-base"
                     [class.text-chip-green-ink]="tx.type === 'income' || (tx.type === 'transfer' && isTransferIncoming(tx))"
@@ -552,8 +601,33 @@
                     }
                     {{ tx.amount | currencyFormat: a.currency_code }}
                   </span>
-                </button>
+
+                  @if (reorderMode()) {
+                    <button
+                      type="button"
+                      cdkDragHandle
+                      aria-label="Geser untuk mengubah urutan"
+                      class="shrink-0 inline-flex items-center justify-center w-8 h-10 rounded-lg text-ink-muted touch-none cursor-grab active:cursor-grabbing active:bg-app"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <svg
+                        class="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <circle cx="9" cy="6" r="1.5" />
+                        <circle cx="15" cy="6" r="1.5" />
+                        <circle cx="9" cy="12" r="1.5" />
+                        <circle cx="15" cy="12" r="1.5" />
+                        <circle cx="9" cy="18" r="1.5" />
+                        <circle cx="15" cy="18" r="1.5" />
+                      </svg>
+                    </button>
+                  }
+                </div>
               }
+              </div>
             }
           </div>
 

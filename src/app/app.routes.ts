@@ -68,6 +68,13 @@ export const routes: Routes = [
           ).then((m) => m.TransactionFormPage),
       },
       {
+        path: 'transactions/import',
+        loadComponent: () =>
+          import(
+            './pages/transactions/transaction-import/transaction-import.page'
+          ).then((m) => m.TransactionImportPage),
+      },
+      {
         path: 'transactions/:id/edit',
         loadComponent: () =>
           import(

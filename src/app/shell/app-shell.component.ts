@@ -109,4 +109,10 @@ export class AppShellComponent {
     await Haptics.impact({ style: ImpactStyle.Light });
     void this.router.navigate(['/calculator']);
   }
+
+  async goToImport(): Promise<void> {
+    this.fabExpanded.set(false);
+    await Haptics.impact({ style: ImpactStyle.Light });
+    void this.router.navigate(['/transactions/import']);
+  }
 }

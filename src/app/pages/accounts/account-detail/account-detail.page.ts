@@ -9,6 +9,12 @@ import {
 import { Location } from '@angular/common';
 import { Router } from '@angular/router';
 import {
+  CdkDrag,
+  CdkDragDrop,
+  CdkDragHandle,
+  CdkDropList,
+} from '@angular/cdk/drag-drop';
+import {
   IonContent,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -41,6 +47,9 @@ interface DateGroup {
   selector: 'app-account-detail',
   standalone: true,
   imports: [
+    CdkDrag,
+    CdkDragHandle,
+    CdkDropList,
     IonContent,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
@@ -73,6 +82,17 @@ export class AccountDetailPage {
   readonly page = signal(0);
   readonly hasMore = signal(true);
   readonly mutasiFilter = signal<MutasiFilter>('all');
+  readonly reorderMode = signal(false);
+  readonly originalSnapshot = signal<Transaction[] | null>(null);
+  readonly saving = signal(false);
+
+  readonly isDirty = computed(() => {
+    const orig = this.originalSnapshot();
+    if (!orig) return false;
+    const curr = this.transactions();
+    if (orig.length !== curr.length) return true;
+    return orig.some((t, i) => t.id !== curr[i]?.id);
+  });
 
   readonly hasAnyReserved = computed(() =>
     this.transactions().some((tx) => tx.reserved_from_account_id != null),
@@ -289,7 +309,86 @@ export class AccountDetailPage {
   }
 
   onTransactionClick(id: number): void {
+    if (this.reorderMode()) return; // chevrons own taps in reorder mode
     void this.router.navigate(['/transactions', id, 'edit']);
+  }
+
+  enterReorderMode(): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    // Force "Semua" so visible order = underlying swap order.
+    this.mutasiFilter.set('all');
+    this.originalSnapshot.set(this.transactions());
+    this.reorderMode.set(true);
+  }
+
+  cancelReorder(): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    const snap = this.originalSnapshot();
+    if (snap) this.transactions.set(snap);
+    this.originalSnapshot.set(null);
+    this.reorderMode.set(false);
+  }
+
+  async saveReorder(): Promise<void> {
+    if (this.saving()) return;
+    if (!this.isDirty()) {
+      this.cancelReorder();
+      return;
+    }
+    this.saving.set(true);
+    this.errorMessage.set(null);
+    await Haptics.impact({ style: ImpactStyle.Medium });
+    try {
+      const updates = this.computeSortUpdates();
+      await this.transactionService.setSortIndices(updates);
+      this.originalSnapshot.set(null);
+      this.reorderMode.set(false);
+      await this.loadFirstPage(this.accountId());
+    } catch (err) {
+      this.errorMessage.set(
+        err instanceof Error ? err.message : 'Gagal menyimpan urutan',
+      );
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  private computeSortUpdates(): { id: number; sort_index: number }[] {
+    const updates: { id: number; sort_index: number }[] = [];
+    const byDate = new Map<string, Transaction[]>();
+    for (const tx of this.transactions()) {
+      const arr = byDate.get(tx.date) ?? [];
+      arr.push(tx);
+      byDate.set(tx.date, arr);
+    }
+    for (const rows of byDate.values()) {
+      const slots = rows.map((r) => r.sort_index ?? 0).sort((a, b) => b - a);
+      rows.forEach((row, i) => {
+        const next = slots[i];
+        if (next !== (row.sort_index ?? 0)) {
+          updates.push({ id: row.id, sort_index: next });
+        }
+      });
+    }
+    return updates;
+  }
+
+  onDrop(event: CdkDragDrop<Transaction[]>, date: string): void {
+    if (event.previousIndex === event.currentIndex) return;
+    void Haptics.impact({ style: ImpactStyle.Light });
+    this.transactions.update((list) => {
+      const next = [...list];
+      const flatIndices: number[] = [];
+      for (let i = 0; i < next.length; i++) {
+        if (next[i].date === date) flatIndices.push(i);
+      }
+      const fromFlat = flatIndices[event.previousIndex];
+      const toFlat = flatIndices[event.currentIndex];
+      if (fromFlat == null || toFlat == null) return list;
+      const [moved] = next.splice(fromFlat, 1);
+      next.splice(toFlat, 0, moved);
+      return next;
+    });
   }
 
   onEdit(): void {
