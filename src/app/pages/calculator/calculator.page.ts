@@ -96,15 +96,30 @@ export class CalculatorPage {
     return this.transactions().filter((t) => sel.has(t.id));
   });
 
+  // Direction of money for THIS row from the account's perspective:
+  //   income / incoming-transfer → "in"  (counts as Masuk, +)
+  //   expense / outgoing-transfer → "out" (counts as Keluar, −)
+  // Transfer side identified by transfer_pair_id < id (out row inserted first,
+  // so the in row gets the higher id), matching the Transaction List renderer.
+  isIncoming(tx: Transaction): boolean {
+    if (tx.type === 'income') return true;
+    if (tx.type === 'transfer') {
+      return (
+        tx.transfer_pair_id != null && tx.transfer_pair_id < tx.id
+      );
+    }
+    return false;
+  }
+
   readonly totalIncome = computed(() =>
     this.selectedTxs()
-      .filter((t) => t.type === 'income')
+      .filter((t) => this.isIncoming(t))
       .reduce((sum, t) => sum + t.amount, 0),
   );
 
   readonly totalExpense = computed(() =>
     this.selectedTxs()
-      .filter((t) => t.type === 'expense')
+      .filter((t) => !this.isIncoming(t))
       .reduce((sum, t) => sum + t.amount, 0),
   );
 

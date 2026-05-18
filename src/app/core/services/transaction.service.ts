@@ -159,7 +159,6 @@ export class TransactionService {
       .getClient()
       .from('transactions')
       .select(TX_SELECT)
-      .in('type', ['income', 'expense'])
       .gte('date', filters.dateFrom)
       .lte('date', filters.dateTo)
       .order('date', { ascending: false })

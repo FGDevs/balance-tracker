@@ -421,6 +421,72 @@
               </span>
             </button>
 
+            @if (shortfall() !== null) {
+              @if (balanceShortage() && balanceShortage()! > 0) {
+                <div class="mt-3 flex items-start gap-2 rounded-xl bg-chip-coral-bg text-chip-coral-ink px-3.5 py-2.5 text-xs leading-snug">
+                  <svg
+                    class="w-3.5 h-3.5 shrink-0 mt-0.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>
+                    Saldo {{ owingAccount()?.name }} hanya
+                    <span class="font-semibold">
+                      {{ owingAccount()?.balance | currencyFormat: currencyCode() }}</span>.
+                    Bayar segini akan membuat saldo minus
+                    <span class="font-semibold">
+                      {{ balanceShortage() | currencyFormat: currencyCode() }}</span>.
+                  </span>
+                </div>
+              } @else if (shortfall()! > 0) {
+                <div class="mt-3 flex items-start gap-2 rounded-xl bg-chip-amber-bg text-chip-amber-ink px-3.5 py-2.5 text-xs leading-snug">
+                  <svg
+                    class="w-3.5 h-3.5 shrink-0 mt-0.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>
+                    Kurang
+                    <span class="font-semibold">
+                      {{ shortfall() | currencyFormat: currencyCode() }}
+                    </span>
+                    untuk lunasi semua hutang akun ini.
+                  </span>
+                </div>
+              } @else {
+                <div class="mt-3 flex items-center gap-2 rounded-xl bg-chip-green-bg text-chip-green-ink px-3.5 py-2.5 text-xs leading-snug font-semibold">
+                  <svg
+                    class="w-3.5 h-3.5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Cukup untuk lunas semua hutang.
+                </div>
+              }
+            }
+
             <label class="block mt-5">
               <span
                 class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
@@ -490,7 +556,10 @@
                   class="flex items-center justify-between pt-2.5 border-t border-on-dark-soft/15"
                 >
                   <span class="text-on-dark-soft">Hutang setelah ini</span>
-                  <span class="font-display text-base">
+                  <span
+                    class="font-display text-base"
+                    [class.text-accent-warm]="totalUnsettled() - preview().totalCovered > 0"
+                  >
                     {{
                       totalUnsettled() - preview().totalCovered
                         | currencyFormat: currencyCode()

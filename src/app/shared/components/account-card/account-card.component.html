@@ -86,6 +86,12 @@
         Hutang
         {{ debtAmount() | currencyFormat: account().currency_code }}
       </span>
+      @if (shortfallAmount() > 0) {
+        <p class="text-[11px] text-chip-coral-ink font-semibold mt-1.5">
+          Kurang
+          {{ shortfallAmount() | currencyFormat: account().currency_code }}
+        </p>
+      }
     }
   </div>
 

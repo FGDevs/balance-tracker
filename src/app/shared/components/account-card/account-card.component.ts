@@ -48,11 +48,20 @@ export class AccountCardComponent {
     () => this.account().total_reserved > 0,
   );
 
+  // Hutang chip is shown only for non-credit accounts. Credit cards already
+  // surface their debt via the negative `balance`, so a chip would duplicate.
   readonly debtAmount = computed(() => {
     const a = this.account();
-    if (a.type === 'credit') {
-      return a.balance < 0 ? Math.abs(a.balance) : 0;
-    }
+    if (a.type === 'credit') return 0;
     return a.total_reserved > 0 ? a.total_reserved : 0;
+  });
+
+  // Saldo shortfall: positive when a non-credit account's real balance can't
+  // cover its outstanding debt. Surfaces how much top-up is needed.
+  readonly shortfallAmount = computed(() => {
+    const a = this.account();
+    if (a.type === 'credit') return 0;
+    const gap = a.total_reserved - a.balance;
+    return gap > 0 ? gap : 0;
   });
 }

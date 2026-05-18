@@ -161,9 +161,9 @@
               (change)="categoryId.set(asNumberId($event))"
               class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             >
-              <option value="">Pilih kategori</option>
+              <option value="" [selected]="categoryId() == null">Pilih kategori</option>
               @for (c of availableCategories(); track c.id) {
-              <option [value]="c.id">{{ c.name }}</option>
+              <option [value]="c.id" [selected]="c.id === categoryId()">{{ c.name }}</option>
               }
             </select>
           </label>
@@ -245,9 +245,9 @@
                           "
                   class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2 text-ink text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 >
-                  <option value="">Pilih kategori</option>
+                  <option value="" [selected]="item.category_id == null">Pilih kategori</option>
                   @for (c of availableCategories(); track c.id) {
-                  <option [value]="c.id">{{ c.name }}</option>
+                  <option [value]="c.id" [selected]="c.id === item.category_id">{{ c.name }}</option>
                   }
                 </select>
               </div>
@@ -308,9 +308,9 @@
                           "
               class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2 text-ink text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             >
-              <option value="">Pilih akun penanggung</option>
+              <option value="" [selected]="item.reserved_from_account_id == null">Pilih akun penanggung</option>
               @for (a of owingAccountOptions(); track a.id) {
-              <option [value]="a.id">{{ a.name }}</option>
+              <option [value]="a.id" [selected]="a.id === item.reserved_from_account_id">{{ a.name }}</option>
               }
             </select>
             @if (owingAccountOptions().length === 0) {
@@ -408,9 +408,9 @@
               [disabled]="editLocked()"
               class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
             >
-              <option value="">Pilih akun pengirim</option>
+              <option value="" [selected]="fromAccountId() == null">Pilih akun pengirim</option>
               @for (a of nonCreditAccounts(); track a.id) {
-              <option [value]="a.id">
+              <option [value]="a.id" [selected]="a.id === fromAccountId()">
                 {{ a.name }}
                 <span class="text-[10px] opacity-50">({{ a.type }})</span>
               </option>
@@ -429,9 +429,13 @@
               [disabled]="editLocked()"
               class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
             >
-              <option value="">Pilih akun penerima</option>
+              <option value="" [selected]="toAccountId() == null">Pilih akun penerima</option>
               @for (a of nonCreditAccounts(); track a.id) {
-              <option [value]="a.id" [disabled]="a.id === fromAccountId()">
+              <option
+                [value]="a.id"
+                [selected]="a.id === toAccountId()"
+                [disabled]="a.id === fromAccountId()"
+              >
                 {{ a.name }}
                 <span class="text-[10px] opacity-50">({{ a.type }})</span>
               </option>
@@ -451,9 +455,9 @@
               [disabled]="editLocked()"
               class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
             >
-              <option value="">Pilih akun</option>
+              <option value="" [selected]="accountId() == null">Pilih akun</option>
               @for (a of primaryAccountOptions(); track a.id) {
-              <option [value]="a.id">
+              <option [value]="a.id" [selected]="a.id === accountId()">
                 {{ a.name }}
                 <span class="text-[10px] text-ink-muted">({{ a.type }})</span>
               </option>
@@ -497,9 +501,9 @@
                 (change)="owingAccountId.set(asNumberId($event))"
                 class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
               >
-                <option value="">Pilih akun</option>
+                <option value="" [selected]="owingAccountId() == null">Pilih akun</option>
                 @for (a of owingAccountOptions(); track a.id) {
-                <option [value]="a.id">{{ a.name }}</option>
+                <option [value]="a.id" [selected]="a.id === owingAccountId()">{{ a.name }}</option>
                 }
               </select>
               @if (owingAccountOptions().length === 0) {

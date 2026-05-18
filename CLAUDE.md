@@ -355,8 +355,9 @@ delete(id: number): Promise<void>
 getItems(transactionId: number): Promise<TransactionItem[]>
 
 // Calculator page (§9): physical-money perspective only — filters by account_id (NOT
-// reserved_from_account_id). Excludes transfers (net to 0 within user's accounts).
-// Caps at 500 rows; the page surfaces a banner when the cap is reached.
+// reserved_from_account_id). Returns all types including transfers (each transfer pair
+// shows as two rows, one per side; when both sides are in scope they net to 0). Caps at
+// 500 rows; the page surfaces a banner when the cap is reached.
 getForCalculator(filters: {
   accountIds: number[] | 'all';
   dateFrom: string;   // 'YYYY-MM-DD' inclusive
@@ -445,10 +446,8 @@ The `extract-transactions` edge function is the only thing that touches the Gemi
 
 ### Account Card
 - Big number: `balance` labeled "Aktual"
-- Below: `Hutang Rp X` coral-tinted chip when this account owes money
-  - Non-credit account: chip amount = `total_reserved` (what this account owes other accounts)
-  - Credit account: chip amount = `ABS(balance)` (what's owed to the bank)
-  - Hide chip when zero
+- Below: `Hutang Rp X` coral-tinted chip — **non-credit accounts only**, when `total_reserved > 0`. Chip amount = `total_reserved` (what this account owes other accounts). Hide when zero. Credit cards never show this chip: the negative `balance` already communicates the debt owed to the bank.
+- When a non-credit account's `balance < total_reserved` (saldo can't cover its outstanding debt), show a small coral text `Kurang Rp X` directly below the Hutang chip, where `X = total_reserved − balance`. Hidden when balance is sufficient. Not applicable to credit cards.
 - `available_balance` is computed in the view but not displayed on the card; it remains available to services/logic that need to answer "can this account afford X?"
 
 ### Tab Bar (mobile shell)
@@ -468,7 +467,8 @@ The `extract-transactions` edge function is the only thing that touches the Gemi
 
 ### Account Detail
 - Show `balance` prominently labeled "Aktual"
-- Show `Hutang` chip below if this account has debt (same rule as Account Card)
+- Show `Hutang` chip below — **non-credit accounts only**, when `total_reserved > 0`. Hidden for credit cards (the negative balance already shows it).
+- Mirror the same `Kurang Rp X` hint below the Hutang chip when a non-credit account's `balance < total_reserved` (same rule as Account Card).
 - If credit account: show `available_credit` and utilization %
 - "Pending reservations" collapsible section listing unsettled reservation **entries** (`ReservationEntry[]`, see §8) against this account. Each entry renders with its amount + category + parent context: for `kind='parent'` entries the row reads like `<category> · <amount>` / secondary `<parent.account.name> · <date>`; for `kind='item'` entries the row reads `<item.category> · <item.amount>` / secondary `dari <parent.account.name> · <date>` so the user sees that this item lives inside a larger cash event.
 - "Settle Debt" CTA button (plain `button` + Tailwind) if `total_reserved > 0`. The CTA opens the Settlement Form pre-filled for this account as the owing party.
@@ -517,9 +517,9 @@ The `extract-transactions` edge function is the only thing that touches the Gemi
 - **Filters**
   - **Akun** — pill row, multi-select. `Semua` is the default and is mutually exclusive with individual selections (selecting any account clears `Semua`; selecting `Semua` clears the others). Lists every non-deleted account including credit cards. Filter applies to `account_id` only (physical-money perspective). Reservations on the owing-side account are NOT included when filtering by the owing account — only when filtering by the payer.
   - **Tanggal** — preset pill row: `Bulan ini` (default), `Bulan lalu`, `30 hari`, `Custom`. `Custom` reveals two `<input type="date">` for from/to. Inclusive on both ends.
-- **List** — transfers excluded entirely (they net to 0 within the user's accounts). Each row is a plain HTML button: checkbox + category/type label + date + account + sign-prefixed amount. Tapping anywhere on the row toggles selection. A `Pilih semua` toggle above the list selects/deselects all currently-visible rows.
+- **List** — includes income, expense, AND transfers. Each transfer row shows a sky `masuk`/`keluar` chip indicating its side (incoming when `transfer_pair_id < id`, outgoing otherwise). Each row is a plain HTML button: checkbox + category/type label + date + account + sign-prefixed amount. Tapping anywhere on the row toggles selection. A `Pilih semua` toggle above the list selects/deselects all currently-visible rows. When `Semua` accounts is active, both sides of an internal transfer appear in the list; selecting both nets to zero in the bottom bar.
 - **Selection model** — `Set<number>` of transaction ids. Selection is cleared whenever any filter (account or date) changes — explicit reset, no hidden state. Selection is ephemeral; navigating away clears it.
-- **Sticky bottom bar** — fixed at the bottom safe area, only when the filtered list is non-empty. Shows: count `{n} dipilih`, breakdown `Masuk Rp Y · Keluar Rp Z`, and the headline `Net Rp X` colored green when > 0, coral when < 0, ink when = 0. Net = `SUM(income) − SUM(expense)` over selected rows. Includes a `Bersihkan` ghost button when count > 0.
+- **Sticky bottom bar** — fixed at the bottom safe area, only when the filtered list is non-empty. Shows: count `{n} dipilih`, breakdown `Masuk Rp Y · Keluar Rp Z`, and the headline `Net Rp X` colored green when > 0, coral when < 0, ink when = 0. `Masuk` sums income amounts + incoming-transfer amounts; `Keluar` sums expense amounts + outgoing-transfer amounts. Net = Masuk − Keluar over selected rows. Includes a `Bersihkan` ghost button when count > 0.
 - **Cap** — `getForCalculator` returns up to 500 rows. When the cap is reached, an amber banner above the list reads "Hasil dipotong di 500 — persempit filter."
 - **Empty / loading** — same vocabulary as other list pages (cream chip icon for empty, spinner for loading).
 
@@ -540,6 +540,12 @@ The `extract-transactions` edge function is the only thing that touches the Gemi
 - Step 2: pick the owing account from those with unsettled reservations to that lender; show the unsettled transaction list + total
 - Step 3: amount input (defaults to full total, can be reduced)
 - Show live preview: which transactions will be fully vs partially settled
+- **Shortfall info** under the amount input (between Step 3 input and the date field). Single chip, evaluated in priority order:
+  1. **Balance shortage (coral)** — when `paymentAmount > owingAccount.balance`, reads `Saldo {owingName} hanya Rp X. Bayar segini akan membuat saldo minus Rp Y.` This wins because going negative is a stronger concern than partial settlement.
+  2. **Debt shortfall (amber)** — when balance is sufficient *and* `paymentAmount < totalUnsettled`, reads `Kurang Rp X untuk lunasi semua hutang akun ini.`
+  3. **All clear (green)** — when balance is sufficient *and* `paymentAmount ≥ totalUnsettled`, reads `Cukup untuk lunas semua hutang.`
+
+  The preview card's `Hutang setelah ini` line also colors amber when > 0 to reinforce remaining debt visually. Neither chip blocks submission — the user can still settle into a negative balance if they intend to top up later.
 - Confirm → runs `SettlementService.settle()`
 
 ---

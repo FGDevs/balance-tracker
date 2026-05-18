@@ -98,6 +98,27 @@ export class SettlementFormPage {
     ),
   );
 
+  // Positive when the user-entered payment is less than the total unsettled
+  // debt for the picked owing/lender pair — i.e. how much more would be needed
+  // to fully clear the debt. Null when nothing is entered yet.
+  readonly shortfall = computed<number | null>(() => {
+    const amt = this.paymentAmount();
+    if (amt == null || amt <= 0) return null;
+    const gap = Number((this.totalUnsettled() - amt).toFixed(2));
+    return gap > 0 ? gap : 0;
+  });
+
+  // Positive when the entered payment exceeds the owing account's current
+  // balance — that account would go minus after settle(). Null when nothing
+  // is entered or the owing account hasn't been picked yet.
+  readonly balanceShortage = computed<number | null>(() => {
+    const amt = this.paymentAmount();
+    const acc = this.owingAccount();
+    if (amt == null || amt <= 0 || !acc) return null;
+    const gap = Number((amt - acc.balance).toFixed(2));
+    return gap > 0 ? gap : 0;
+  });
+
   readonly currencyCode = computed(
     () => this.owingAccount()?.currency_code ?? 'IDR',
   );

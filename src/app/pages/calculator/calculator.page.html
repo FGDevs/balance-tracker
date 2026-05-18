@@ -276,9 +276,19 @@
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
                   <p class="text-sm font-medium text-ink truncate">
-                    {{ tx.category?.name ?? 'Tanpa kategori' }}
+                    @if (tx.type === 'transfer') {
+                      Transfer
+                    } @else {
+                      {{ tx.category?.name ?? 'Tanpa kategori' }}
+                    }
                   </p>
-                  @if (tx.reserved_from_account_id) {
+                  @if (tx.type === 'transfer') {
+                    <span
+                      class="shrink-0 inline-flex items-center rounded-full bg-chip-sky-bg text-chip-sky-ink text-[10px] font-semibold px-2 py-0.5 tracking-wide"
+                    >
+                      {{ isIncoming(tx) ? 'masuk' : 'keluar' }}
+                    </span>
+                  } @else if (tx.reserved_from_account_id) {
                     <span
                       class="shrink-0 inline-flex items-center rounded-full bg-chip-amber-bg text-chip-amber-ink text-[10px] font-semibold px-2 py-0.5 tracking-wide"
                     >
@@ -296,10 +306,10 @@
 
               <span
                 class="shrink-0 font-display text-base"
-                [class.text-chip-green-ink]="tx.type === 'income'"
-                [class.text-chip-coral-ink]="tx.type === 'expense'"
+                [class.text-chip-green-ink]="isIncoming(tx)"
+                [class.text-chip-coral-ink]="!isIncoming(tx)"
               >
-                {{ tx.type === 'income' ? '+' : '−' }}
+                {{ isIncoming(tx) ? '+' : '−' }}
                 {{ tx.amount | currencyFormat: currency() }}
               </span>
             </button>

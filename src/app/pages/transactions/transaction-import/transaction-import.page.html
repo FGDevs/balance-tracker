@@ -342,9 +342,9 @@
                   [disabled]="draft.skip"
                   class="w-full rounded-xl bg-app border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
                 >
-                  <option value="">Tanpa kategori</option>
+                  <option value="" [selected]="draft.suggestedCategoryId == null">Tanpa kategori</option>
                   @for (cat of categoriesForDraft(draft); track cat.id) {
-                    <option [value]="cat.id">{{ cat.name }}</option>
+                    <option [value]="cat.id" [selected]="cat.id === draft.suggestedCategoryId">{{ cat.name }}</option>
                   }
                 </select>
               </label>
@@ -385,9 +385,9 @@
                   [disabled]="draft.skip"
                   class="w-full rounded-xl bg-card border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
                 >
-                  <option value="">Pilih akun {{ draft.transferDirection === 'in' ? 'asal' : 'tujuan' }}…</option>
+                  <option value="" [selected]="draft.transferAccountId == null">Pilih akun {{ draft.transferDirection === 'in' ? 'asal' : 'tujuan' }}…</option>
                   @for (acc of otherAccounts(); track acc.id) {
-                    <option [value]="acc.id">{{ acc.name }}</option>
+                    <option [value]="acc.id" [selected]="acc.id === draft.transferAccountId">{{ acc.name }}</option>
                   }
                 </select>
                 @if (!draft.skip && !draft.transferAccountId) {
