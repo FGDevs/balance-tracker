@@ -1,4 +1,11 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   IonContent,
@@ -8,6 +15,8 @@ import {
 } from '@ionic/angular/standalone';
 import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ViewerScopeService } from '../../core/services/viewer-scope.service';
+import { ViewerScope } from '../../core/models';
 import { AccountCardComponent } from '../../shared/components/account-card/account-card.component';
 import { CurrencyFormatPipe } from '../../shared/pipes/currency-format.pipe';
 
@@ -28,10 +37,36 @@ export class DashboardPage implements OnInit {
   private accountService = inject(AccountService);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private viewerScope = inject(ViewerScopeService);
 
   readonly accounts = this.accountService.accounts;
+  readonly scope = this.viewerScope.scope;
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
+
+  readonly scopeOptions: { value: ViewerScope; label: string }[] = [
+    { value: 'all', label: 'Semua' },
+    { value: 'mine', label: 'Saya' },
+    { value: 'others', label: 'Lain' },
+  ];
+
+  setScope(next: ViewerScope): void {
+    if (this.scope() === next) return;
+    this.viewerScope.set(next);
+  }
+
+  constructor() {
+    // Reload accounts when scope changes (ngOnInit already covers initial load).
+    let firstRun = true;
+    effect(() => {
+      const _ = this.scope();
+      if (firstRun) {
+        firstRun = false;
+        return;
+      }
+      void this.load();
+    });
+  }
 
   readonly totalActual = computed(() =>
     this.accounts().reduce((sum, a) => sum + a.balance, 0),

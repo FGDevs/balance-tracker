@@ -1,10 +1,11 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { IonContent } from '@ionic/angular/standalone';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { AccountService } from '../../core/services/account.service';
 import { TransactionService } from '../../core/services/transaction.service';
-import { Transaction } from '../../core/models';
+import { ViewerScopeService } from '../../core/services/viewer-scope.service';
+import { Transaction, ViewerScope } from '../../core/models';
 import { CurrencyFormatPipe } from '../../shared/pipes/currency-format.pipe';
 
 type DatePreset = 'this-month' | 'last-month' | 'last-30' | 'custom';
@@ -66,9 +67,18 @@ function presetRange(preset: DatePreset, today = new Date()): {
 export class CalculatorPage {
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
+  private readonly viewerScope = inject(ViewerScopeService);
   private readonly location = inject(Location);
 
   readonly presets = PRESETS;
+
+  readonly scope = this.viewerScope.scope;
+
+  readonly scopeOptions: { value: ViewerScope; label: string }[] = [
+    { value: 'all', label: 'Semua' },
+    { value: 'mine', label: 'Saya' },
+    { value: 'others', label: 'Lain' },
+  ];
 
   readonly accounts = computed(() => this.accountService.allAccounts());
 
@@ -141,6 +151,24 @@ export class CalculatorPage {
 
   constructor() {
     void this.bootstrap();
+    // §13.6 — scope changes count as a filter change: clear the selection
+    // (consistent with date/account changes) and refetch.
+    let firstScopeRun = true;
+    effect(() => {
+      const _ = this.scope();
+      if (firstScopeRun) {
+        firstScopeRun = false;
+        return;
+      }
+      this.clearSelection();
+      void this.fetch();
+    });
+  }
+
+  async setScope(next: ViewerScope): Promise<void> {
+    if (this.scope() === next) return;
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.viewerScope.set(next);
   }
 
   private async bootstrap(): Promise<void> {

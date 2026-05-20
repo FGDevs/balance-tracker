@@ -1,8 +1,40 @@
-# Design System — Component Recipes & Tailwind Config
-
-Token definitions, color palette, typography, radii, and money-display patterns live in `CLAUDE.md §14.1–14.4 + §14.6`. This file holds the canonical Tailwind class strings for plain-HTML components and the canonical Tailwind config.
+# Design System — Warm Brown / Cream
 
 The live config is at `tailwind.config.js`; the live CSS variables are at `src/theme/variables.scss`. Treat this doc as a reference for new components, not as an additional source of truth.
+
+---
+
+## Visual Identity
+- Mood: warm, editorial, soft — chocolate hero, cream body, white cards, orange/amber accents.
+- Inspiration: cookbook/journal aesthetic — generous whitespace, rounded everything.
+- Mode: light only for v1 (no dark mode toggle).
+
+## Typography
+- **Display** (serif, italic for emphasis): `'Fraunces'`, fallback `Georgia, serif` → page hero titles, large account-balance numbers, account names on cards.
+- **Body** (sans-serif): `'Plus Jakarta Sans'`, fallback `system-ui, sans-serif` → all UI text, buttons, inputs, labels.
+- **Label** (tracked-wide uppercase): body sans, `text-xs tracking-[0.18em] uppercase font-semibold` → small section eyebrows ("BEKAL KANTOR", "5 HARI KERJA").
+- Both fonts loaded from Google Fonts via `<link>` in `index.html`.
+
+## Radius & Shadow
+- `rounded-full` — pills, chips, segment tabs, FAB.
+- `rounded-2xl` (16px) — cards, modal sheets, banner.
+- `rounded-xl` (12px) — inputs, buttons.
+- `rounded-b-3xl` — hero section bottom edge (soft transition into cream body).
+- Card shadow: `shadow-card` → `0 2px 12px -4px rgba(61,36,24,0.08)` (registered as Tailwind shadow).
+- No hard borders on cards — separation comes from shadow + bg contrast.
+
+## Money Display Pattern
+Accounts lead with `Aktual` and surface debt as a chip when present:
+```html
+<p class="text-xs tracking-[0.18em] uppercase text-ink-muted">Aktual</p>
+<p class="font-display text-3xl text-ink">Rp 1.500.000</p>
+<!-- Only when debt > 0 -->
+<span class="inline-flex items-center gap-1.5 rounded-full bg-chip-coral-bg text-chip-coral-ink
+             text-xs font-semibold px-3 py-1.5 mt-2">
+  Hutang Rp 250.000
+</span>
+```
+Negative / over-budget uses `text-chip-coral-ink`; positive growth uses `text-chip-green-ink`. Five canonical chip variants: `green` (success), `coral` (warn/spend), `sky` (info), `amber` (highlight), `cream` (neutral).
 
 ---
 

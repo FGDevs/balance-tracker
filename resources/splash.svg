@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732">
+  <!-- Cream background, matches color-app token -->
+  <rect width="2732" height="2732" fill="#faf3ea"/>
+
+  <!-- Seedling centered, scaled to ~38% of canvas; stem darkened to read on cream -->
+  <g transform="translate(1366 1366) scale(1.05) translate(-512 -512)">
+    <!-- Stem -->
+    <path d="M 512 800 L 512 470"
+          stroke="#6b4f3a" stroke-width="22" stroke-linecap="round" fill="none" opacity="0.7"/>
+
+    <!-- Ground curl -->
+    <path d="M 456 802 Q 512 820, 568 802"
+          stroke="#6b4f3a" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Left leaf -->
+    <g transform="rotate(-32 388 420)">
+      <ellipse cx="388" cy="420" rx="148" ry="86" fill="#d97a3c"/>
+      <line x1="248" y1="420" x2="528" y2="420"
+            stroke="#3d2418" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+    </g>
+
+    <!-- Right leaf -->
+    <g transform="rotate(32 636 420)">
+      <ellipse cx="636" cy="420" rx="148" ry="86" fill="#e9b067"/>
+      <line x1="496" y1="420" x2="776" y2="420"
+            stroke="#3d2418" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+    </g>
+  </g>
+</svg>

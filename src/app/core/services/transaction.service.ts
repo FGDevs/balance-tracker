@@ -6,6 +6,7 @@ import {
 } from '../models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { ViewerScopeService } from './viewer-scope.service';
 
 // Per-item reservation is user input. settlement_id / parent_item_id are owned
 // by the settle flow and never accepted from the caller.
@@ -33,6 +34,7 @@ const TX_SELECT = `${TX_PARENT_SELECT}, items:transaction_items(${TX_ITEM_SELECT
 export class TransactionService {
   private supabase = inject(SupabaseService);
   private auth = inject(AuthService);
+  private viewerScope = inject(ViewerScopeService);
 
   static readonly PAGE_SIZE = 20;
   static readonly CALCULATOR_CAP = 500;
@@ -56,7 +58,7 @@ export class TransactionService {
   async getAll(page = 0): Promise<Transaction[]> {
     const from = page * TransactionService.PAGE_SIZE;
     const to = from + TransactionService.PAGE_SIZE - 1;
-    const { data, error } = await this.supabase
+    let q = this.supabase
       .getClient()
       .from('transactions')
       .select(TX_SELECT)
@@ -64,12 +66,14 @@ export class TransactionService {
       .order('sort_index', { ascending: false })
       .order('id', { ascending: false })
       .range(from, to);
+    q = this.applyScope(q);
+    const { data, error } = await q;
     if (error) throw error;
     return this.normalize((data ?? []) as Transaction[]);
   }
 
   async getRecent(limit: number): Promise<Transaction[]> {
-    const { data, error } = await this.supabase
+    let q = this.supabase
       .getClient()
       .from('transactions')
       .select(TX_SELECT)
@@ -77,6 +81,8 @@ export class TransactionService {
       .order('sort_index', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit);
+    q = this.applyScope(q);
+    const { data, error } = await q;
     if (error) throw error;
     return this.normalize((data ?? []) as Transaction[]);
   }
@@ -169,6 +175,7 @@ export class TransactionService {
       if (filters.accountIds.length === 0) return [];
       q = q.in('account_id', filters.accountIds);
     }
+    q = this.applyScope(q);
     const { data, error } = await q;
     if (error) throw error;
     return this.normalize((data ?? []) as Transaction[]);
@@ -187,10 +194,11 @@ export class TransactionService {
   }
 
   async create(
-    data: Omit<Transaction, 'id' | 'user_id' | 'created_at'>,
+    data: Omit<Transaction, 'id' | 'user_id' | 'created_by' | 'created_at'>,
     items?: TransactionItemInput[],
   ): Promise<Transaction> {
-    const userId = this.requireUserId();
+    const createdBy = this.requireUserId();
+    const ownerId = await this.resolveAccountOwner(data.account_id);
     const hasItems = !!items && items.length > 0;
     if (hasItems) await this.validateItemReservations(items!, data.account_id);
     const { amount, categoryId } = this.applyItemsToParent(data, items);
@@ -205,7 +213,8 @@ export class TransactionService {
       .from('transactions')
       .insert({
         ...stripped,
-        user_id: userId,
+        user_id: ownerId,
+        created_by: createdBy,
         amount,
         category_id: categoryId,
         reserved_from_account_id: reservedFrom,
@@ -217,7 +226,7 @@ export class TransactionService {
     const tx = row as Transaction;
 
     if (hasItems) {
-      await this.insertItems(tx.id, items!);
+      await this.insertItems(tx.id, items!, createdBy);
     }
 
     if (tx.type === 'income') {
@@ -242,14 +251,19 @@ export class TransactionService {
     if (params.fromAccountId === params.toAccountId) {
       throw new Error('Source and destination must differ');
     }
-    const userId = this.requireUserId();
+    const createdBy = this.requireUserId();
+    const [fromOwner, toOwner] = await Promise.all([
+      this.resolveAccountOwner(params.fromAccountId),
+      this.resolveAccountOwner(params.toAccountId),
+    ]);
     const client = this.supabase.getClient();
 
     const baseSort = params.sortIndex ?? Date.now();
     const { data: outRow, error: outErr } = await client
       .from('transactions')
       .insert({
-        user_id: userId,
+        user_id: fromOwner,
+        created_by: createdBy,
         account_id: params.fromAccountId,
         amount: params.amount,
         type: 'transfer',
@@ -264,7 +278,8 @@ export class TransactionService {
     const { data: inRow, error: inErr } = await client
       .from('transactions')
       .insert({
-        user_id: userId,
+        user_id: toOwner,
+        created_by: createdBy,
         account_id: params.toAccountId,
         amount: params.amount,
         type: 'transfer',
@@ -310,7 +325,8 @@ export class TransactionService {
       throw new Error('Owing account cannot be a credit card');
     }
 
-    const userId = this.requireUserId();
+    const createdBy = this.requireUserId();
+    const payerOwner = await this.resolveAccountOwner(params.payerAccountId);
     const hasItems = !!params.items && params.items.length > 0;
 
     if (hasItems) {
@@ -330,7 +346,8 @@ export class TransactionService {
       const { data: row, error } = await client
         .from('transactions')
         .insert({
-          user_id: userId,
+          user_id: payerOwner,
+          created_by: createdBy,
           account_id: params.payerAccountId,
           reserved_from_account_id: null,
           category_id: null,
@@ -344,7 +361,7 @@ export class TransactionService {
         .single();
       if (error) throw error;
       const tx = row as Transaction;
-      await this.insertItems(tx.id, promoted);
+      await this.insertItems(tx.id, promoted, createdBy);
       await this.adjustBalance(params.payerAccountId, -amount);
       return tx;
     }
@@ -353,7 +370,8 @@ export class TransactionService {
     const { data: row, error } = await client
       .from('transactions')
       .insert({
-        user_id: userId,
+        user_id: payerOwner,
+        created_by: createdBy,
         account_id: params.payerAccountId,
         reserved_from_account_id: params.reservedFromAccountId,
         category_id: params.categoryId ?? null,
@@ -392,7 +410,7 @@ export class TransactionService {
         if (!existing) throw new Error('Transaction not found');
         this.validateItems(items);
         await this.validateItemReservations(items, existing.account_id);
-        await this.insertItems(id, items);
+        await this.insertItems(id, items, this.requireUserId());
         patch = {
           ...patch,
           amount: this.sumItems(items),
@@ -523,7 +541,7 @@ export class TransactionService {
   // ── helpers ──────────────────────────────────────────────────────────────
 
   private applyItemsToParent(
-    data: Omit<Transaction, 'id' | 'user_id' | 'created_at'>,
+    data: Omit<Transaction, 'id' | 'user_id' | 'created_by' | 'created_at'>,
     items: TransactionItemInput[] | undefined,
   ): { amount: number; categoryId: number | null } {
     if (!items || items.length === 0) {
@@ -559,9 +577,11 @@ export class TransactionService {
   private async insertItems(
     transactionId: number,
     items: TransactionItemInput[],
+    createdBy: string,
   ): Promise<void> {
     const rows = items.map((item, idx) => ({
       transaction_id: transactionId,
+      created_by: createdBy,
       category_id: item.category_id ?? null,
       amount: item.amount,
       note: item.note ?? null,
@@ -573,6 +593,32 @@ export class TransactionService {
       .from('transaction_items')
       .insert(rows);
     if (error) throw error;
+  }
+
+  // §13.6 — push the Saya/Lain/Semua filter down to Postgres so pagination
+  // stays correct. NOT applied to getByAccount: account-detail's mutasi list
+  // surfaces every transaction on the account regardless of author, per the
+  // "bank-statement integrity comes first" rule.
+  private applyScope<T extends { eq: Function; neq: Function }>(q: T): T {
+    const scope = this.viewerScope.scope();
+    const uid = this.auth.currentUser()?.id;
+    if (!uid || scope === 'all') return q;
+    if (scope === 'mine') return q.eq('created_by', uid);
+    return q.neq('created_by', uid);
+  }
+
+  // Resolves a transaction's group owner (= accounts.user_id) given an
+  // account id. Required before INSERT/UPDATE so the row lands in the
+  // correct group regardless of who's authoring it (§13).
+  private async resolveAccountOwner(accountId: number): Promise<string> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('accounts')
+      .select('user_id')
+      .eq('id', accountId)
+      .single();
+    if (error) throw error;
+    return (data as { user_id: string }).user_id;
   }
 
   // Async validation of per-item reservation:

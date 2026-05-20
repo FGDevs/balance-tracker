@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Chocolate background, matches color-hero token -->
+  <rect width="1024" height="1024" fill="#3d2418"/>
+
+  <!-- Stem: gently rising from base, tan tone -->
+  <path d="M 512 830 L 512 470"
+        stroke="#c89e6b" stroke-width="22" stroke-linecap="round" fill="none"/>
+
+  <!-- Subtle ground curl at base -->
+  <path d="M 456 832 Q 512 850, 568 832"
+        stroke="#c89e6b" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- Left leaf: accent orange, angled up-left -->
+  <g transform="rotate(-32 388 420)">
+    <ellipse cx="388" cy="420" rx="148" ry="86" fill="#d97a3c"/>
+    <line x1="248" y1="420" x2="528" y2="420"
+          stroke="#3d2418" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+  </g>
+
+  <!-- Right leaf: accent amber, angled up-right -->
+  <g transform="rotate(32 636 420)">
+    <ellipse cx="636" cy="420" rx="148" ry="86" fill="#e9b067"/>
+    <line x1="496" y1="420" x2="776" y2="420"
+          stroke="#3d2418" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+  </g>
+</svg>

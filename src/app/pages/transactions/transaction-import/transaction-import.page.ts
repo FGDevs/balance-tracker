@@ -9,15 +9,23 @@ import {
   BankImportError,
   BankImportService,
 } from '../../../core/services/bank-import.service';
-import { Category, ImportDraft } from '../../../core/models';
+import {
+  ACCOUNT_TYPE_LABEL,
+  Category,
+  ImportDraft,
+} from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
+import {
+  SearchableSelectComponent,
+  SearchableSelectOption,
+} from '../../../shared/components/searchable-select/searchable-select.component';
 
 type Step = 'account' | 'upload' | 'extracting' | 'review';
 
 @Component({
   selector: 'app-transaction-import',
   standalone: true,
-  imports: [IonContent, CurrencyFormatPipe],
+  imports: [IonContent, CurrencyFormatPipe, SearchableSelectComponent],
   templateUrl: './transaction-import.page.html',
 })
 export class TransactionImportPage {
@@ -53,6 +61,23 @@ export class TransactionImportPage {
     const id = this.accountId();
     return this.accounts().filter((a) => a.id !== id);
   });
+
+  readonly incomeCategoryPickerOptions = computed<SearchableSelectOption[]>(
+    () => this.incomeCategories().map((c) => ({ id: c.id, label: c.name })),
+  );
+
+  readonly expenseCategoryPickerOptions = computed<SearchableSelectOption[]>(
+    () => this.expenseCategories().map((c) => ({ id: c.id, label: c.name })),
+  );
+
+  readonly transferAccountPickerOptions = computed<SearchableSelectOption[]>(
+    () =>
+      this.otherAccounts().map((a) => ({
+        id: a.id,
+        label: a.name,
+        sublabel: ACCOUNT_TYPE_LABEL[a.type],
+      })),
+  );
 
   readonly missingTransferAccount = computed(() =>
     this.drafts().some(
@@ -194,6 +219,10 @@ export class TransactionImportPage {
     this.updateDraft(index, { suggestedCategoryId: id });
   }
 
+  onCategoryPick(index: number, id: number | null): void {
+    this.updateDraft(index, { suggestedCategoryId: id ?? undefined });
+  }
+
   onTransferDirectionChange(index: number, value: 'in' | 'out'): void {
     this.updateDraft(index, { transferDirection: value });
   }
@@ -201,6 +230,10 @@ export class TransactionImportPage {
   onTransferAccountChange(index: number, value: string): void {
     const id = value ? Number(value) : undefined;
     this.updateDraft(index, { transferAccountId: id });
+  }
+
+  onTransferAccountPick(index: number, id: number | null): void {
+    this.updateDraft(index, { transferAccountId: id ?? undefined });
   }
 
   toggleSkip(index: number): void {

@@ -13,7 +13,10 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "generate-env": "node scripts/generate-env.js"
+    "generate-env": "node scripts/generate-env.js",
+    "assets": "node scripts/generate-assets.mjs",
+    "start-android": "ionic cap run android --external -l",
+    "build-android": "ng build && capacitor copy android && capacitor open android"
   },
   "private": true,
   "dependencies": {
@@ -26,6 +29,7 @@
     "@angular/platform-browser": "^20.0.0",
     "@angular/platform-browser-dynamic": "^20.0.0",
     "@angular/router": "^20.0.0",
+    "@capacitor/android": "^8.3.4",
     "@capacitor/app": "8.1.0",
     "@capacitor/core": "8.3.1",
     "@capacitor/haptics": "8.0.2",
@@ -48,6 +52,7 @@
     "@angular/cli": "^20.0.0",
     "@angular/compiler-cli": "^20.0.0",
     "@angular/language-service": "^20.0.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "8.3.1",
     "@ionic/angular-toolkit": "^12.0.0",
     "@types/jasmine": "~5.1.0",
@@ -67,6 +72,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "postcss": "^8.5.14",
+    "sharp": "^0.33.5",
     "supabase": "^2.98.2",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.0"

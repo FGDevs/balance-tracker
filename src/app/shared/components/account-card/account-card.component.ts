@@ -1,13 +1,8 @@
-import { Component, computed, input, output } from '@angular/core';
-import { AccountBalance, AccountType } from '../../../core/models';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { ACCOUNT_TYPE_LABEL, AccountBalance } from '../../../core/models';
+import { AuthService } from '../../../core/services/auth.service';
+import { GroupService } from '../../../core/services/group.service';
 import { CurrencyFormatPipe } from '../../pipes/currency-format.pipe';
-
-const TYPE_LABEL: Record<AccountType, string> = {
-  cash: 'Tunai',
-  bank: 'Bank',
-  credit: 'Kartu Kredit',
-  savings: 'Tabungan',
-};
 
 @Component({
   selector: 'app-account-card',
@@ -16,10 +11,24 @@ const TYPE_LABEL: Record<AccountType, string> = {
   templateUrl: './account-card.component.html',
 })
 export class AccountCardComponent {
+  private readonly auth = inject(AuthService);
+  private readonly groups = inject(GroupService);
+
   readonly account = input.required<AccountBalance>();
   readonly cardClick = output<number>();
 
-  readonly typeLabel = computed(() => TYPE_LABEL[this.account().type]);
+  readonly typeLabel = computed(() => ACCOUNT_TYPE_LABEL[this.account().type]);
+
+  // §13 — foreign-owner annotation. When this account lives in another
+  // host's group, show their display name next to the account name.
+  // Hidden for the user's own accounts and when the host's profile hasn't
+  // loaded yet.
+  readonly foreignOwnerName = computed(() => {
+    const a = this.account();
+    const me = this.auth.currentUser()?.id;
+    if (!me || a.user_id === me) return null;
+    return this.groups.nameFor(a.user_id);
+  });
 
   readonly utilization = computed(() => {
     const a = this.account();
@@ -64,4 +73,22 @@ export class AccountCardComponent {
     const gap = a.total_reserved - a.balance;
     return gap > 0 ? gap : 0;
   });
+
+  readonly shortfallPopoverOpen = signal(false);
+
+  toggleShortfallPopover(event: Event): void {
+    event.stopPropagation();
+    this.shortfallPopoverOpen.update((v) => !v);
+  }
+
+  closeShortfallPopover(): void {
+    this.shortfallPopoverOpen.set(false);
+  }
+
+  onCardKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.cardClick.emit(this.account().id);
+    }
+  }
 }

@@ -34,13 +34,22 @@ export class SettlementService {
     if (!Number.isFinite(params.paymentAmount) || params.paymentAmount <= 0) {
       throw new Error('Payment amount must be greater than zero');
     }
-    const userId = this.auth.currentUser()?.id;
-    if (!userId) throw new Error('Not authenticated');
+    const createdBy = this.auth.currentUser()?.id;
+    if (!createdBy) throw new Error('Not authenticated');
     const client = this.supabase.getClient();
+
+    // Resolve group owners up-front; lender's owner becomes the settlement's
+    // user_id (§13). Transfer-pair rows each take their own account's owner.
+    const [lenderOwner, owingOwner] = await Promise.all([
+      this.resolveAccountOwner(params.payerAccountId),
+      this.resolveAccountOwner(params.reservedFromAccountId),
+    ]);
 
     const { data: sRow, error: sErr } = await client
       .from('debt_settlements')
       .insert({
+        user_id: lenderOwner,
+        created_by: createdBy,
         account_id: params.payerAccountId,
         reserved_from_account_id: params.reservedFromAccountId,
         total_amount: params.paymentAmount,
@@ -55,7 +64,8 @@ export class SettlementService {
     const { data: outRow, error: outErr } = await client
       .from('transactions')
       .insert({
-        user_id: userId,
+        user_id: owingOwner,
+        created_by: createdBy,
         account_id: params.reservedFromAccountId,
         amount: params.paymentAmount,
         type: 'transfer',
@@ -71,7 +81,8 @@ export class SettlementService {
     const { data: inRow, error: inErr } = await client
       .from('transactions')
       .insert({
-        user_id: userId,
+        user_id: lenderOwner,
+        created_by: createdBy,
         account_id: params.payerAccountId,
         amount: params.paymentAmount,
         type: 'transfer',
@@ -119,7 +130,13 @@ export class SettlementService {
         const remainderAmount = Number(
           (entry.amount - remaining).toFixed(2),
         );
-        await this.splitPartial(entry, settlement.id, settledPortion, remainderAmount, userId);
+        await this.splitPartial(
+          entry,
+          settlement.id,
+          settledPortion,
+          remainderAmount,
+          createdBy,
+        );
         remaining = 0;
       }
     }
@@ -186,12 +203,15 @@ export class SettlementService {
     if (error) throw error;
   }
 
+  // userId here is the *author* of this settlement run (the caller). The
+  // remainder row INHERITS the original's group ownership (user_id) and
+  // reservation columns — only created_by reflects who split it.
   private async splitPartial(
     entry: ReservationEntry,
     settlementId: number,
     settledPortion: number,
     remainderAmount: number,
-    userId: string,
+    createdBy: string,
   ): Promise<void> {
     const client = this.supabase.getClient();
     if (entry.kind === 'parent') {
@@ -202,7 +222,8 @@ export class SettlementService {
         .eq('id', entry.id);
       if (u) throw u;
       const { error: i } = await client.from('transactions').insert({
-        user_id: userId,
+        user_id: tx.user_id,
+        created_by: createdBy,
         account_id: tx.account_id,
         category_id: tx.category_id ?? null,
         reserved_from_account_id: tx.reserved_from_account_id,
@@ -235,6 +256,7 @@ export class SettlementService {
 
     const { error: i } = await client.from('transaction_items').insert({
       transaction_id: original.transaction_id,
+      created_by: createdBy,
       category_id: original.category_id ?? null,
       amount: remainderAmount,
       note: original.note ?? null,
@@ -243,6 +265,17 @@ export class SettlementService {
       parent_item_id: entry.id,
     });
     if (i) throw i;
+  }
+
+  private async resolveAccountOwner(accountId: number): Promise<string> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('accounts')
+      .select('user_id')
+      .eq('id', accountId)
+      .single();
+    if (error) throw error;
+    return (data as { user_id: string }).user_id;
   }
 
   private async adjustBalance(accountId: number, delta: number): Promise<void> {

@@ -2,6 +2,16 @@ export type AccountType = 'cash' | 'bank' | 'credit' | 'savings';
 export type TransactionType = 'income' | 'expense' | 'transfer';
 export type CategoryType = 'income' | 'expense' | 'transfer';
 
+export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
+  cash: 'Tunai',
+  bank: 'Bank',
+  credit: 'Kartu Kredit',
+  savings: 'Tabungan',
+};
+
+// §13: which authors' rows the user wants to see in lists.
+export type ViewerScope = 'mine' | 'others' | 'all';
+
 export interface Profile {
   id: string;
   name: string;
@@ -10,9 +20,38 @@ export interface Profile {
   updated_at: string;
 }
 
+// §13: an invited member belongs to a host's group. PK = (host, member).
+// `host` / `member` Profile pointers are hydrated by service-layer joins
+// for display in the Profile page lists.
+export interface GroupMembership {
+  host_user_id: string;
+  member_user_id: string;
+  joined_at: string;
+  host?: Profile;
+  member?: Profile;
+}
+
+export type GroupInvitationStatus =
+  | 'pending'
+  | 'accepted'
+  | 'revoked'
+  | 'expired';
+
+export interface GroupInvitation {
+  id: number;
+  host_user_id: string;
+  invitee_email: string;
+  token: string;
+  status: GroupInvitationStatus;
+  created_at: string;
+  expires_at?: string | null;
+  accepted_at?: string | null;
+}
+
 export interface Account {
   id: number;
-  user_id: string;
+  user_id: string;          // group owner
+  created_by: string;       // author (§13)
   name: string;
   type: AccountType;
   balance: number;
@@ -23,6 +62,7 @@ export interface Account {
   statement_day?: number;
   payment_due_day?: number;
   created_at: string;
+  created_by_user?: Profile;
 }
 
 export interface AccountBalance extends Account {
@@ -32,17 +72,20 @@ export interface AccountBalance extends Account {
 
 export interface Category {
   id: number;
-  user_id: string | null;
+  user_id: string | null;     // NULL = system default
+  created_by: string | null;  // NULL = system default; else author (§13)
   name: string;
   type: CategoryType;
   icon?: string;
   color?: string;
   parent_id?: number;
+  created_by_user?: Profile;
 }
 
 export interface Transaction {
   id: number;
-  user_id: string;
+  user_id: string;            // group owner
+  created_by: string;         // author (§13)
   account_id: number;
   category_id?: number;       // NULL when items[] is non-empty (see §7.6)
   amount: number;             // equals SUM(items.amount) at create/update time
@@ -58,12 +101,14 @@ export interface Transaction {
   category?: Category;
   account?: Account;
   reserved_from_account?: Account;
+  created_by_user?: Profile;
   items?: TransactionItem[];
 }
 
 export interface TransactionItem {
   id: number;
   transaction_id: number;
+  created_by: string;         // author (§13)
   category_id?: number;
   amount: number;
   note?: string;
@@ -91,6 +136,8 @@ export interface ReservationEntry {
 export interface DebtSettlement {
   id: number;
   transfer_tx_id?: number;
+  user_id: string;            // group owner (= lender account.user_id)
+  created_by: string;         // author (§13)
   account_id: number;
   reserved_from_account_id: number;
   total_amount: number;

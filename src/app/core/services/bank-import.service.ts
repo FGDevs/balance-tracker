@@ -85,7 +85,7 @@ export class BankImportService {
           date: draft.date,
           note,
           sort_index: sortIndex,
-        } as Omit<Transaction, 'id' | 'user_id' | 'created_at'>);
+        } as Omit<Transaction, 'id' | 'user_id' | 'created_by' | 'created_at'>);
       }
     }
   }

@@ -1,23 +1,17 @@
 <ion-content [fullscreen]="true">
   <div class="min-h-full bg-app font-sans pb-12">
     <!-- Compact editorial hero -->
-    <section
-      class="relative overflow-hidden bg-hero text-on-dark px-6 pt-8 pb-12 rounded-b-3xl"
-    >
+    <section class="relative overflow-hidden bg-hero text-on-dark px-6 pt-8 pb-12 rounded-b-3xl">
+      <div class="pointer-events-none absolute -top-20 -right-16 w-64 h-64 rounded-full bg-accent/15 blur-3xl"></div>
       <div
-        class="pointer-events-none absolute -top-20 -right-16 w-64 h-64 rounded-full bg-accent/15 blur-3xl"
-      ></div>
-      <div
-        class="pointer-events-none absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-accent-warm/10 blur-3xl"
-      ></div>
+        class="pointer-events-none absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-accent-warm/10 blur-3xl"></div>
 
       <div class="relative max-w-md mx-auto">
         <button
           type="button"
           (click)="goBack()"
           class="inline-flex items-center justify-center w-10 h-10 -ml-2 rounded-full text-on-dark hover:bg-on-dark/10 active:scale-95 transition"
-          aria-label="Kembali"
-        >
+          aria-label="Kembali">
           <svg
             class="w-5 h-5"
             viewBox="0 0 24 24"
@@ -25,18 +19,15 @@
             stroke="currentColor"
             stroke-width="2"
             stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+            stroke-linejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
 
         <div class="flex items-center gap-3 mt-4">
           <span class="block h-px w-6 bg-accent-warm"></span>
-          <p
-            class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold"
-          >
-            {{ isEdit() ? 'Edit transaksi' : 'Transaksi baru' }}
+          <p class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold">
+            {{ isEdit() ? "Edit transaksi" : "Transaksi baru" }}
           </p>
         </div>
 
@@ -50,16 +41,13 @@
 
     @if (loading()) {
     <div class="flex justify-center py-16">
-      <span
-        class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"
-      ></span>
+      <span class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"></span>
     </div>
     } @else {
     <form
       (submit)="$event.preventDefault(); onSave()"
       class="px-5 mt-6 max-w-md mx-auto flex flex-col gap-4"
-      novalidate
-    >
+      novalidate>
       <!-- TYPE PILLS -->
       @if (!editLocked()) {
       <div class="grid grid-cols-3 gap-2">
@@ -73,8 +61,7 @@
           [class.border-ink]="type() === option.value"
           [class.bg-card]="type() !== option.value"
           [class.text-ink-soft]="type() !== option.value"
-          [class.border-transparent]="type() !== option.value"
-        >
+          [class.border-transparent]="type() !== option.value">
           <svg
             class="w-4 h-4 shrink-0"
             viewBox="0 0 24 24"
@@ -82,13 +69,18 @@
             stroke="currentColor"
             stroke-width="1.75"
             stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+            stroke-linejoin="round">
             @switch (option.value) { @case ('expense') {
-            <circle cx="12" cy="12" r="9" />
+            <circle
+              cx="12"
+              cy="12"
+              r="9" />
             <path d="M12 16V8 M8 12l4-4 4 4" />
             } @case ('income') {
-            <circle cx="12" cy="12" r="9" />
+            <circle
+              cx="12"
+              cy="12"
+              r="9" />
             <path d="M12 8v8 M8 12l4 4 4-4" />
             } @case ('transfer') {
             <path d="M7 4l-4 4 4 4 M3 8h14 M17 20l4-4-4-4 M21 16H7" />
@@ -103,15 +95,12 @@
       <!-- CARD 1: NILAI & KATEGORI / RINCIAN -->
       <section class="bg-card rounded-2xl shadow-card p-6">
         <div class="flex items-center justify-between gap-3">
-          <p
-            class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
-          >
-            {{ itemsMode() ? 'Total & rincian' : 'Nilai & kategori' }}
+          <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">
+            {{ itemsMode() ? "Total & rincian" : "Nilai & kategori" }}
           </p>
           @if (itemsMode()) {
           <span
-            class="inline-flex items-center gap-1.5 rounded-full bg-chip-amber-bg text-chip-amber-ink text-[11px] font-semibold px-2.5 py-1"
-          >
+            class="inline-flex items-center gap-1.5 rounded-full bg-chip-amber-bg text-chip-amber-ink text-[11px] font-semibold px-2.5 py-1">
             {{ items().length }} rincian
           </span>
           }
@@ -121,15 +110,10 @@
         <!-- SINGLE MODE -->
         <div class="mt-4 flex flex-col gap-4">
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Nominal
-            </span>
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Nominal </span>
             <div class="relative">
               <span
-                class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-muted text-sm font-semibold pointer-events-none"
-              >
+                class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-muted text-sm font-semibold pointer-events-none">
                 Rp
               </span>
               <input
@@ -139,76 +123,57 @@
                 [value]="amount()"
                 (input)="amount.set(asNumber($event))"
                 [disabled]="editLocked()"
-                class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-4 py-3 text-ink font-display text-xl placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
-              />
+                class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-4 py-3 text-ink font-display text-xl placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70" />
             </div>
             @if (editLocked()) {
-            <span class="text-[11px] text-ink-muted mt-1">
-              Nominal tidak bisa diubah saat edit.
-            </span>
+            <span class="text-[11px] text-ink-muted mt-1"> Nominal tidak bisa diubah saat edit. </span>
             }
           </label>
 
           @if (type() !== 'transfer') {
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Kategori
-            </span>
-            <select
-              [value]="categoryId() ?? ''"
-              (change)="categoryId.set(asNumberId($event))"
-              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-            >
-              <option value="" [selected]="categoryId() == null">Pilih kategori</option>
-              @for (c of availableCategories(); track c.id) {
-              <option [value]="c.id" [selected]="c.id === categoryId()">{{ c.name }}</option>
-              }
-            </select>
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Kategori </span>
+            <app-searchable-select
+              [options]="categoryPickerOptions()"
+              [value]="categoryId()"
+              (valueChange)="categoryId.set($event)"
+              placeholder="Pilih kategori"
+              searchPlaceholder="Cari kategori..."
+              modalTitle="Pilih kategori"
+              modalEyebrow="Kategori"
+              emptyMessage="Kategori tidak ditemukan." />
           </label>
 
           <button
             type="button"
             (click)="enableSplit()"
             [disabled]="!canSplit() || editLocked()"
-            class="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-transparent text-ink-soft border border-dashed border-ink/20 font-medium px-4 py-2.5 text-sm hover:bg-app active:scale-[0.99] transition disabled:opacity-40"
-          >
+            class="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-transparent text-ink-soft border border-dashed border-ink/20 font-medium px-4 py-2.5 text-sm hover:bg-app active:scale-[0.99] transition disabled:opacity-40">
             <svg
               class="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
-              stroke-linecap="round"
-            >
+              stroke-linecap="round">
               <path d="M12 5v14 M5 12h14" />
             </svg>
             Pecah jadi rincian
           </button>
           @if (!canSplit()) {
-          <p class="text-[11px] text-ink-muted -mt-2">
-            Transfer tidak bisa dipecah.
-          </p>
+          <p class="text-[11px] text-ink-muted -mt-2">Transfer tidak bisa dipecah.</p>
           } }
         </div>
         } @else {
         <!-- SPLIT MODE -->
         <div class="mt-4">
-          <p
-            class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-          >
-            Total
-          </p>
-          <p
-            class="font-display text-[2rem] leading-none text-ink mt-1 break-words"
-          >
+          <p class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold">Total</p>
+          <p class="font-display text-[2rem] leading-none text-ink mt-1 break-words">
             {{ itemsTotal() | currencyFormat }}
           </p>
           @if (editLocked()) {
           <p class="text-[11px] text-ink-muted mt-2">
-            Rincian tidak bisa diubah saat edit. Hapus dan buat ulang bila
-            perlu.
+            Rincian tidak bisa diubah saat edit. Hapus dan buat ulang bila perlu.
           </p>
           }
         </div>
@@ -216,15 +181,13 @@
         <div class="h-px bg-ink/10 my-5"></div>
 
         <div class="flex flex-col gap-2">
-          @for (item of items(); track $index; let i = $index) { @if
-          (!itemsLocked()) {
+          @for (item of items(); track $index; let i = $index) { @if (!itemsLocked()) {
           <div class="rounded-xl bg-app p-3 flex flex-col gap-2">
             <div class="flex items-start gap-2">
               <div class="flex-1 grid grid-cols-[7rem_1fr] gap-2">
                 <div class="relative">
                   <span
-                    class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-xs font-semibold pointer-events-none"
-                  >
+                    class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-xs font-semibold pointer-events-none">
                     Rp
                   </span>
                   <input
@@ -232,40 +195,33 @@
                     inputmode="decimal"
                     placeholder="0"
                     [value]="item.amount"
-                    (input)="
-                              updateItem(i, { amount: asNumber($event) })
-                            "
-                    class="w-full rounded-lg bg-card border border-ink/10 pl-8 pr-2 py-2 text-ink text-sm placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  />
+                    (input)="updateItem(i, { amount: asNumber($event) })"
+                    class="w-full rounded-lg bg-card border border-ink/10 pl-8 pr-2 py-2 text-ink text-sm placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
                 </div>
-                <select
-                  [value]="item.category_id ?? ''"
-                  (change)="
-                            updateItem(i, { category_id: asNumberId($event) })
-                          "
-                  class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2 text-ink text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                >
-                  <option value="" [selected]="item.category_id == null">Pilih kategori</option>
-                  @for (c of availableCategories(); track c.id) {
-                  <option [value]="c.id" [selected]="c.id === item.category_id">{{ c.name }}</option>
-                  }
-                </select>
+                <app-searchable-select
+                  [options]="categoryPickerOptions()"
+                  [value]="item.category_id"
+                  (valueChange)="updateItem(i, { category_id: $event })"
+                  placeholder="Pilih kategori"
+                  searchPlaceholder="Cari kategori..."
+                  modalTitle="Kategori rincian"
+                  modalEyebrow="Pilih kategori"
+                  emptyMessage="Kategori tidak ditemukan."
+                  [compact]="true" />
               </div>
               <button
                 type="button"
                 (click)="removeItem(i)"
                 [disabled]="items().length <= 1"
                 class="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:bg-card hover:text-chip-coral-ink active:scale-90 transition disabled:opacity-30"
-                aria-label="Hapus rincian"
-              >
+                aria-label="Hapus rincian">
                 <svg
                   class="w-4 h-4"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
-                  stroke-linecap="round"
-                >
+                  stroke-linecap="round">
                   <path d="M6 6l12 12 M6 18L18 6" />
                 </svg>
               </button>
@@ -276,47 +232,32 @@
               placeholder="Catatan rincian (opsional)"
               [value]="item.note"
               (input)="updateItem(i, { note: asValue($event) })"
-              class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2 text-ink text-sm placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-            />
+              class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2 text-ink text-sm placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
 
             @if (type() === 'expense') {
-            <label
-              class="flex items-center justify-between gap-3 cursor-pointer pt-1"
-            >
-              <span class="text-xs font-medium text-ink-soft">
-                Hutang ke akun lain?
-              </span>
+            <label class="flex items-center justify-between gap-3 cursor-pointer pt-1">
+              <span class="text-xs font-medium text-ink-soft"> Hutang ke akun lain? </span>
               <input
                 type="checkbox"
                 class="w-4 h-4 accent-[var(--color-accent)] cursor-pointer"
                 [checked]="item.reservation_enabled"
-                (change)="
-                            toggleItemReservation(
-                              i,
-                              $any($event.target).checked
-                            )
-                          "
-              />
+                (change)="toggleItemReservation(i, $any($event.target).checked)" />
             </label>
             @if (item.reservation_enabled) {
-            <select
-              [value]="item.reserved_from_account_id ?? ''"
-              (change)="
-                            updateItem(i, {
-                              reserved_from_account_id: asNumberId($event)
-                            })
-                          "
-              class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2 text-ink text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-            >
-              <option value="" [selected]="item.reserved_from_account_id == null">Pilih akun penanggung</option>
-              @for (a of owingAccountOptions(); track a.id) {
-              <option [value]="a.id" [selected]="a.id === item.reserved_from_account_id">{{ a.name }}</option>
-              }
-            </select>
+            <app-searchable-select
+              [options]="owingAccountPickerOptions()"
+              [value]="item.reserved_from_account_id"
+              (valueChange)="
+                updateItem(i, { reserved_from_account_id: $event })
+              "
+              placeholder="Pilih akun penanggung"
+              searchPlaceholder="Cari akun..."
+              modalTitle="Akun penanggung"
+              modalEyebrow="Pilih akun"
+              emptyMessage="Akun tidak ditemukan."
+              [compact]="true" />
             @if (owingAccountOptions().length === 0) {
-            <span class="text-[11px] text-chip-amber-ink">
-              Tidak ada akun non-kredit lain yang tersedia.
-            </span>
+            <span class="text-[11px] text-chip-amber-ink"> Tidak ada akun non-kredit lain yang tersedia. </span>
             } } }
           </div>
           } @else {
@@ -326,16 +267,12 @@
               <span class="text-sm text-ink truncate">
                 {{ categoryNameOf(item.category_id) }}
               </span>
-              <span
-                class="font-display text-base text-ink shrink-0 tabular-nums"
-              >
+              <span class="font-display text-base text-ink shrink-0 tabular-nums">
                 {{ item.amount | currencyFormat }}
               </span>
             </div>
             @if (item.reservation_enabled && item.reserved_from_account_id) {
-            <span
-              class="inline-flex items-center gap-1 text-[11px] font-medium text-chip-coral-ink"
-            >
+            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-chip-coral-ink">
               <svg
                 class="w-3 h-3"
                 viewBox="0 0 24 24"
@@ -343,8 +280,7 @@
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+                stroke-linejoin="round">
                 <path d="M5 12h14 M13 6l6 6-6 6" />
               </svg>
               Hutang ke {{ accountNameOf(item.reserved_from_account_id) }}
@@ -361,16 +297,14 @@
           <button
             type="button"
             (click)="addItem()"
-            class="inline-flex items-center justify-center gap-2 rounded-xl bg-transparent text-ink-soft border border-dashed border-ink/20 font-medium px-4 py-2.5 text-sm hover:bg-app active:scale-[0.99] transition"
-          >
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-transparent text-ink-soft border border-dashed border-ink/20 font-medium px-4 py-2.5 text-sm hover:bg-app active:scale-[0.99] transition">
             <svg
               class="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
-              stroke-linecap="round"
-            >
+              stroke-linecap="round">
               <path d="M12 5v14 M5 12h14" />
             </svg>
             Tambah rincian
@@ -378,8 +312,7 @@
           <button
             type="button"
             (click)="disableSplit()"
-            class="inline-flex items-center justify-center gap-2 text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold py-2 hover:text-ink transition"
-          >
+            class="inline-flex items-center justify-center gap-2 text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold py-2 hover:text-ink transition">
             Lepas rincian
           </button>
         </div>
@@ -388,128 +321,84 @@
 
       <!-- CARD 2: AKUN -->
       <section class="bg-card rounded-2xl shadow-card p-6">
-        <p
-          class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
-        >
-          {{ type() === 'transfer' ? 'Akun pengirim & penerima' : 'Akun' }}
+        <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">
+          {{ type() === "transfer" ? "Akun pengirim & penerima" : "Akun" }}
         </p>
 
         <div class="mt-4 flex flex-col gap-4">
           @if (type() === 'transfer') {
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Dari
-            </span>
-            <select
-              [value]="fromAccountId() ?? ''"
-              (change)="fromAccountId.set(asNumberId($event))"
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Dari </span>
+            <app-searchable-select
+              [options]="fromAccountPickerOptions()"
+              [value]="fromAccountId()"
+              (valueChange)="fromAccountId.set($event)"
               [disabled]="editLocked()"
-              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
-            >
-              <option value="" [selected]="fromAccountId() == null">Pilih akun pengirim</option>
-              @for (a of nonCreditAccounts(); track a.id) {
-              <option [value]="a.id" [selected]="a.id === fromAccountId()">
-                {{ a.name }}
-                <span class="text-[10px] opacity-50">({{ a.type }})</span>
-              </option>
-              }
-            </select>
+              placeholder="Pilih akun pengirim"
+              searchPlaceholder="Cari akun..."
+              modalTitle="Akun pengirim"
+              modalEyebrow="Transfer dari"
+              emptyMessage="Akun tidak ditemukan." />
           </label>
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Ke
-            </span>
-            <select
-              [value]="toAccountId() ?? ''"
-              (change)="toAccountId.set(asNumberId($event))"
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Ke </span>
+            <app-searchable-select
+              [options]="toAccountPickerOptions()"
+              [value]="toAccountId()"
+              (valueChange)="toAccountId.set($event)"
               [disabled]="editLocked()"
-              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
-            >
-              <option value="" [selected]="toAccountId() == null">Pilih akun penerima</option>
-              @for (a of nonCreditAccounts(); track a.id) {
-              <option
-                [value]="a.id"
-                [selected]="a.id === toAccountId()"
-                [disabled]="a.id === fromAccountId()"
-              >
-                {{ a.name }}
-                <span class="text-[10px] opacity-50">({{ a.type }})</span>
-              </option>
-              }
-            </select>
+              placeholder="Pilih akun penerima"
+              searchPlaceholder="Cari akun..."
+              modalTitle="Akun penerima"
+              modalEyebrow="Transfer ke"
+              emptyMessage="Akun tidak ditemukan." />
           </label>
           } @else {
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Akun pembayar
-            </span>
-            <select
-              [value]="accountId() ?? ''"
-              (change)="accountId.set(asNumberId($event))"
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Akun </span>
+            <app-searchable-select
+              [options]="primaryAccountPickerOptions()"
+              [value]="accountId()"
+              (valueChange)="accountId.set($event)"
               [disabled]="editLocked()"
-              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70"
-            >
-              <option value="" [selected]="accountId() == null">Pilih akun</option>
-              @for (a of primaryAccountOptions(); track a.id) {
-              <option [value]="a.id" [selected]="a.id === accountId()">
-                {{ a.name }}
-                <span class="text-[10px] text-ink-muted">({{ a.type }})</span>
-              </option>
-              }
-            </select>
+              placeholder="Pilih akun"
+              searchPlaceholder="Cari akun..."
+              modalTitle="Pilih akun"
+              modalEyebrow="Akun pembayar"
+              emptyMessage="Akun tidak ditemukan." />
           </label>
 
           @if (canShowReservationToggle() && !editLocked()) {
           <div class="rounded-xl bg-app p-4">
-            <label
-              class="flex items-center justify-between gap-3 cursor-pointer"
-            >
-              <span class="text-sm font-medium text-ink">
-                Bayar dari akun lain?
-              </span>
+            <label class="flex items-center justify-between gap-3 cursor-pointer">
+              <span class="text-sm font-medium text-ink"> Catat sebagai hutang? </span>
               <input
                 type="checkbox"
                 class="w-5 h-5 accent-[var(--color-accent)] cursor-pointer"
                 [checked]="payFromAnother()"
-                (change)="
-                        onPayFromAnotherChange(
-                          $any($event.target).checked
-                        )
-                      "
-              />
+                (change)="onPayFromAnotherChange($any($event.target).checked)" />
             </label>
             <p class="text-xs text-ink-muted mt-1.5 leading-relaxed">
-              Tagih {{ selectedAccount()?.name ?? 'akun pembayar' }} sekarang,
-              tetapi catat utangnya pada akun lain.
+              Transaksi ini dicatat sebagai hutang pada akun lain.
             </p>
 
             @if (payFromAnother()) {
             <label class="flex flex-col gap-1.5 mt-3">
-              <span
-                class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-              >
+              <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold">
                 Akun penanggung
               </span>
-              <select
-                [value]="owingAccountId() ?? ''"
-                (change)="owingAccountId.set(asNumberId($event))"
-                class="w-full rounded-lg bg-card border border-ink/10 px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-              >
-                <option value="" [selected]="owingAccountId() == null">Pilih akun</option>
-                @for (a of owingAccountOptions(); track a.id) {
-                <option [value]="a.id" [selected]="a.id === owingAccountId()">{{ a.name }}</option>
-                }
-              </select>
+              <app-searchable-select
+                [options]="owingAccountPickerOptions()"
+                [value]="owingAccountId()"
+                (valueChange)="owingAccountId.set($event)"
+                placeholder="Pilih akun"
+                searchPlaceholder="Cari akun..."
+                modalTitle="Akun penanggung"
+                modalEyebrow="Pilih akun"
+                emptyMessage="Akun tidak ditemukan."
+                [compact]="true" />
               @if (owingAccountOptions().length === 0) {
-              <span class="text-[11px] text-chip-amber-ink mt-1">
-                Tidak ada akun non-kredit lain yang tersedia.
-              </span>
+              <span class="text-[11px] text-chip-amber-ink mt-1"> Tidak ada akun non-kredit lain yang tersedia. </span>
               }
             </label>
             }
@@ -520,48 +409,32 @@
 
       <!-- CARD 3: WAKTU & CATATAN -->
       <section class="bg-card rounded-2xl shadow-card p-6">
-        <p
-          class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
-        >
-          Waktu &amp; catatan
-        </p>
+        <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Waktu &amp; catatan</p>
 
         <div class="mt-4 flex flex-col gap-4">
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Tanggal
-            </span>
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Tanggal </span>
             <input
               type="date"
               [value]="date()"
               (input)="date.set(asValue($event))"
-              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-            />
+              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
           </label>
 
           <label class="flex flex-col gap-1.5">
-            <span
-              class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-            >
-              Catatan
-            </span>
+            <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Catatan </span>
             <textarea
               rows="2"
               placeholder="Tulis catatan (opsional)"
               [value]="note()"
               (input)="note.set(asValue($event))"
-              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 resize-none"
-            ></textarea>
+              class="w-full rounded-xl bg-app border border-ink/10 px-4 py-3 text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 resize-none"></textarea>
           </label>
         </div>
       </section>
 
       @if (errorMessage()) {
-      <p
-        class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug"
-      >
+      <p class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug">
         {{ errorMessage() }}
       </p>
       }
@@ -570,15 +443,13 @@
         <button
           type="submit"
           [disabled]="!canSave() || saving()"
-          class="rounded-xl bg-accent text-on-dark font-semibold px-5 py-3.5 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
-        >
+          class="rounded-xl bg-accent text-on-dark font-semibold px-5 py-3.5 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2">
           @if (saving()) {
           <span
-            class="inline-block w-4 h-4 border-2 border-on-dark/40 border-t-on-dark rounded-full animate-spin"
-          ></span>
+            class="inline-block w-4 h-4 border-2 border-on-dark/40 border-t-on-dark rounded-full animate-spin"></span>
           <span>Menyimpan&hellip;</span>
           } @else {
-          <span>{{ isEdit() ? 'Simpan perubahan' : 'Catat transaksi' }}</span>
+          <span>{{ isEdit() ? "Simpan perubahan" : "Catat transaksi" }}</span>
           }
         </button>
 
@@ -587,8 +458,7 @@
           type="button"
           (click)="openDeleteConfirm()"
           [disabled]="saving()"
-          class="rounded-xl bg-card shadow-card text-chip-coral-ink font-semibold px-5 py-3.5 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2"
-        >
+          class="rounded-xl bg-card shadow-card text-chip-coral-ink font-semibold px-5 py-3.5 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2">
           <svg
             class="w-4 h-4"
             viewBox="0 0 24 24"
@@ -596,8 +466,7 @@
             stroke="currentColor"
             stroke-width="1.75"
             stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+            stroke-linejoin="round">
             <path d="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
           </svg>
@@ -615,32 +484,23 @@
     (didDismiss)="closeDeleteConfirm()"
     [breakpoints]="[0, 1]"
     [initialBreakpoint]="1"
-    handleBehavior="cycle"
-  >
+    handleBehavior="cycle">
     <ng-template>
-      <div
-        class="bg-app px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-      >
-        <p
-          class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold"
-        >
-          Konfirmasi
-        </p>
+      <div class="bg-app px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Konfirmasi</p>
         <h3 class="font-display text-[1.75rem] leading-tight text-ink mt-2">
           Hapus
           <span class="italic text-chip-coral-ink">transaksi</span>?
         </h3>
         <p class="text-sm text-ink-soft mt-3 leading-relaxed">
-          Saldo akun akan dikembalikan dan rincian (jika ada) ikut terhapus.
-          Tindakan ini tidak bisa dibatalkan.
+          Saldo akun akan dikembalikan dan rincian (jika ada) ikut terhapus. Tindakan ini tidak bisa dibatalkan.
         </p>
 
         <div class="flex flex-col gap-2 mt-6">
           <button
             type="button"
             (click)="onConfirmDelete()"
-            class="rounded-xl bg-chip-coral-ink text-on-dark font-semibold px-5 py-3.5 active:scale-[0.98] transition flex items-center justify-center gap-2"
-          >
+            class="rounded-xl bg-chip-coral-ink text-on-dark font-semibold px-5 py-3.5 active:scale-[0.98] transition flex items-center justify-center gap-2">
             <svg
               class="w-4 h-4"
               viewBox="0 0 24 24"
@@ -648,8 +508,7 @@
               stroke="currentColor"
               stroke-width="1.75"
               stroke-linecap="round"
-              stroke-linejoin="round"
-            >
+              stroke-linejoin="round">
               <path d="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
             </svg>
@@ -658,8 +517,7 @@
           <button
             type="button"
             (click)="closeDeleteConfirm()"
-            class="rounded-xl bg-transparent text-ink border border-ink/15 font-medium px-5 py-3.5 active:scale-[0.99] transition"
-          >
+            class="rounded-xl bg-transparent text-ink border border-ink/15 font-medium px-5 py-3.5 active:scale-[0.99] transition">
             Batal
           </button>
         </div>

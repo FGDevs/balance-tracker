@@ -336,17 +336,18 @@
                 <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold">
                   Kategori
                 </span>
-                <select
-                  [value]="draft.suggestedCategoryId ?? ''"
-                  (change)="onCategoryChange(i, $any($event.target).value)"
+                <app-searchable-select
+                  [options]="draft.type === 'income' ? incomeCategoryPickerOptions() : expenseCategoryPickerOptions()"
+                  [value]="draft.suggestedCategoryId ?? null"
+                  (valueChange)="onCategoryPick(i, $event)"
                   [disabled]="draft.skip"
-                  class="w-full rounded-xl bg-app border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
-                >
-                  <option value="" [selected]="draft.suggestedCategoryId == null">Tanpa kategori</option>
-                  @for (cat of categoriesForDraft(draft); track cat.id) {
-                    <option [value]="cat.id" [selected]="cat.id === draft.suggestedCategoryId">{{ cat.name }}</option>
-                  }
-                </select>
+                  placeholder="Tanpa kategori"
+                  searchPlaceholder="Cari kategori..."
+                  modalTitle="Pilih kategori"
+                  modalEyebrow="Kategori draft"
+                  emptyMessage="Kategori tidak ditemukan."
+                  [allowClear]="true"
+                  [compact]="true" />
               </label>
             } @else {
               <div class="flex flex-col gap-2 rounded-xl bg-chip-sky-bg/40 p-3">
@@ -379,17 +380,17 @@
                     Masuk dari
                   </button>
                 </div>
-                <select
-                  [value]="draft.transferAccountId ?? ''"
-                  (change)="onTransferAccountChange(i, $any($event.target).value)"
+                <app-searchable-select
+                  [options]="transferAccountPickerOptions()"
+                  [value]="draft.transferAccountId ?? null"
+                  (valueChange)="onTransferAccountPick(i, $event)"
                   [disabled]="draft.skip"
-                  class="w-full rounded-xl bg-card border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
-                >
-                  <option value="" [selected]="draft.transferAccountId == null">Pilih akun {{ draft.transferDirection === 'in' ? 'asal' : 'tujuan' }}…</option>
-                  @for (acc of otherAccounts(); track acc.id) {
-                    <option [value]="acc.id" [selected]="acc.id === draft.transferAccountId">{{ acc.name }}</option>
-                  }
-                </select>
+                  [placeholder]="'Pilih akun ' + (draft.transferDirection === 'in' ? 'asal' : 'tujuan') + '…'"
+                  searchPlaceholder="Cari akun..."
+                  [modalTitle]="draft.transferDirection === 'in' ? 'Akun asal' : 'Akun tujuan'"
+                  modalEyebrow="Transfer ke / dari"
+                  emptyMessage="Akun tidak ditemukan."
+                  [compact]="true" />
                 @if (!draft.skip && !draft.transferAccountId) {
                   <p class="text-[11px] text-chip-coral-ink">
                     Pilih akun {{ draft.transferDirection === 'in' ? 'asal' : 'tujuan' }} agar bisa disimpan.

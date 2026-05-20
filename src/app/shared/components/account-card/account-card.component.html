@@ -1,7 +1,9 @@
-<button
-  type="button"
+<div
+  role="button"
+  tabindex="0"
   (click)="cardClick.emit(account().id)"
-  class="text-left w-full bg-card rounded-2xl shadow-card p-5 active:scale-[0.99] transition flex flex-col gap-4"
+  (keydown)="onCardKeydown($event)"
+  class="text-left w-full bg-card rounded-2xl shadow-card p-5 active:scale-[0.99] transition flex flex-col gap-4 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
 >
   <!-- Header: type icon + label + name -->
   <div class="flex items-start gap-3">
@@ -51,11 +53,32 @@
     </span>
 
     <div class="min-w-0 flex-1">
-      <p
-        class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
-      >
-        {{ typeLabel() }}
-      </p>
+      <div class="flex items-center gap-2">
+        <p
+          class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold"
+        >
+          {{ typeLabel() }}
+        </p>
+        @if (foreignOwnerName()) {
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-chip-cream-bg text-chip-cream-ink text-[10px] font-semibold px-2 py-0.5 max-w-[8rem] truncate"
+          >
+            <svg
+              class="w-2.5 h-2.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21a8 8 0 0 1 16 0" />
+            </svg>
+            <span class="truncate">{{ foreignOwnerName() }}</span>
+          </span>
+        }
+      </div>
       <h3 class="font-display text-lg text-ink leading-tight mt-0.5 truncate">
         {{ account().name }}
       </h3>
@@ -80,18 +103,92 @@
       {{ account().balance | currencyFormat: account().currency_code }}
     </p>
     @if (debtAmount() > 0) {
-      <span
-        class="inline-flex items-center gap-1.5 rounded-full bg-chip-coral-bg text-chip-coral-ink text-xs font-semibold px-3 py-1.5 mt-2"
+      <div
+        class="relative inline-block mt-2"
+        [class.z-40]="shortfallPopoverOpen()"
       >
-        Hutang
-        {{ debtAmount() | currencyFormat: account().currency_code }}
-      </span>
-      @if (shortfallAmount() > 0) {
-        <p class="text-[11px] text-chip-coral-ink font-semibold mt-1.5">
-          Kurang
-          {{ shortfallAmount() | currencyFormat: account().currency_code }}
-        </p>
-      }
+        <!-- Backdrop tap-catcher (only rendered when popover open) -->
+        @if (shortfallPopoverOpen()) {
+          <button
+            type="button"
+            (click)="closeShortfallPopover(); $event.stopPropagation()"
+            class="fixed inset-0 z-30 cursor-default"
+            aria-label="Tutup info"
+          ></button>
+        }
+
+        <!-- The chip — now a button when there's hidden info to reveal -->
+        @if (shortfallAmount() > 0) {
+          <button
+            type="button"
+            (click)="toggleShortfallPopover($event)"
+            [attr.aria-expanded]="shortfallPopoverOpen()"
+            aria-haspopup="dialog"
+            class="relative z-40 inline-flex items-center gap-1.5 rounded-full bg-chip-coral-bg text-chip-coral-ink text-xs font-semibold pl-3 pr-2.5 py-1.5 active:scale-[0.97] transition"
+          >
+            <span>
+              Hutang
+              {{ debtAmount() | currencyFormat: account().currency_code }}
+            </span>
+            <span
+              aria-hidden="true"
+              class="block w-1.5 h-1.5 rounded-full bg-chip-coral-ink/70 animate-pulse"
+            ></span>
+          </button>
+        } @else {
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full bg-chip-coral-bg text-chip-coral-ink text-xs font-semibold px-3 py-1.5"
+          >
+            Hutang
+            {{ debtAmount() | currencyFormat: account().currency_code }}
+          </span>
+        }
+
+        <!-- Margin-note popover (always in DOM for transition, gated by shortfall) -->
+        @if (shortfallAmount() > 0) {
+          <div
+            role="dialog"
+            aria-label="Detail kekurangan saldo"
+            (click)="$event.stopPropagation()"
+            class="absolute z-50 top-full left-0 mt-2.5 w-60 origin-top-left transition-all duration-200 ease-out"
+            [class.opacity-0]="!shortfallPopoverOpen()"
+            [class.opacity-100]="shortfallPopoverOpen()"
+            [class.scale-95]="!shortfallPopoverOpen()"
+            [class.scale-100]="shortfallPopoverOpen()"
+            [class.-translate-y-1]="!shortfallPopoverOpen()"
+            [class.translate-y-0]="shortfallPopoverOpen()"
+            [class.pointer-events-none]="!shortfallPopoverOpen()"
+            [attr.aria-hidden]="!shortfallPopoverOpen()"
+          >
+            <!-- Tail pointing up to the chip -->
+            <svg
+              class="absolute left-5 -top-[7px] w-3 h-2 text-chip-cream-bg drop-shadow-[0_-1px_0_rgba(181,74,60,0.18)]"
+              viewBox="0 0 12 8"
+              aria-hidden="true"
+            >
+              <path d="M6 0 L12 8 L0 8 Z" fill="currentColor" />
+            </svg>
+
+            <div
+              class="relative bg-chip-cream-bg rounded-2xl px-4 py-3 shadow-[0_14px_28px_-10px_rgba(61,36,24,0.35),0_3px_8px_-2px_rgba(61,36,24,0.12)] ring-1 ring-chip-coral-ink/15"
+            >
+              <p
+                class="font-display italic text-chip-coral-ink text-[11px] tracking-wide leading-none"
+              >
+                Kurang
+              </p>
+              <p
+                class="font-display text-base text-chip-coral-ink leading-tight mt-1"
+              >
+                {{ shortfallAmount() | currencyFormat: account().currency_code }}
+              </p>
+              <p class="text-[11px] text-ink-soft leading-snug mt-2">
+                Saldo akun ini belum cukup untuk lunasi semua hutang.
+              </p>
+            </div>
+          </div>
+        }
+      </div>
     }
   </div>
 
@@ -113,4 +210,4 @@
       </p>
     </div>
   }
-</button>
+</div>

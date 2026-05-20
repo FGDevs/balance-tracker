@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   CdkDrag,
@@ -16,8 +16,11 @@ import {
   RefresherCustomEvent,
 } from '@ionic/angular/standalone';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { AuthService } from '../../../core/services/auth.service';
+import { GroupService } from '../../../core/services/group.service';
 import { TransactionService } from '../../../core/services/transaction.service';
-import { Transaction } from '../../../core/models';
+import { ViewerScopeService } from '../../../core/services/viewer-scope.service';
+import { Transaction, ViewerScope } from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
 
 interface DateGroup {
@@ -45,6 +48,30 @@ interface DateGroup {
 export class TransactionListPage {
   private readonly transactionService = inject(TransactionService);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+  private readonly groups = inject(GroupService);
+  private readonly viewerScope = inject(ViewerScopeService);
+
+  readonly scope = this.viewerScope.scope;
+
+  readonly scopeOptions: { value: ViewerScope; label: string }[] = [
+    { value: 'all', label: 'Semua' },
+    { value: 'mine', label: 'Saya' },
+    { value: 'others', label: 'Lain' },
+  ];
+
+  // Foreign-author name for a row. Null when tx was created by the current
+  // user (annotation hidden) or when the creator's profile isn't loaded yet.
+  authorNameOf(tx: Transaction): string | null {
+    const me = this.auth.currentUser()?.id;
+    if (!me || tx.created_by === me) return null;
+    return this.groups.nameFor(tx.created_by);
+  }
+
+  setScope(next: ViewerScope): void {
+    if (this.scope() === next) return;
+    this.viewerScope.set(next);
+  }
 
   readonly loading = signal(false);
   readonly transactions = signal<Transaction[]>([]);
@@ -94,6 +121,17 @@ export class TransactionListPage {
 
   constructor() {
     void this.loadFirstPage();
+    // Reload when the viewer scope changes. Watching `scope` only — initial
+    // call above already covers first paint.
+    let firstScopeRun = true;
+    effect(() => {
+      const _ = this.scope();
+      if (firstScopeRun) {
+        firstScopeRun = false;
+        return;
+      }
+      void this.loadFirstPage();
+    });
   }
 
   ionViewWillEnter(): void {

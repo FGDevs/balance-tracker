@@ -1,0 +1,13 @@
+{
+    "overrides": [
+        {
+            "files": "*.html",
+            "options": {
+                "parser": "angular",
+                "bracketSameLine": true,
+                "singleAttributePerLine": true,
+                "printWidth": 120
+            }
+        }
+    ]
+}

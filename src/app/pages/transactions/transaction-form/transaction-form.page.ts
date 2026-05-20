@@ -15,8 +15,16 @@ import {
   TransactionItemInput,
   TransactionService,
 } from '../../../core/services/transaction.service';
-import { Transaction, TransactionType } from '../../../core/models';
+import {
+  ACCOUNT_TYPE_LABEL,
+  Transaction,
+  TransactionType,
+} from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
+import {
+  SearchableSelectComponent,
+  SearchableSelectOption,
+} from '../../../shared/components/searchable-select/searchable-select.component';
 
 interface RincianRow {
   amount: number | null;
@@ -37,7 +45,7 @@ interface TypeOption {
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [IonContent, IonModal, CurrencyFormatPipe],
+  imports: [IonContent, IonModal, CurrencyFormatPipe, SearchableSelectComponent],
   templateUrl: './transaction-form.page.html',
 })
 export class TransactionFormPage {
@@ -97,6 +105,45 @@ export class TransactionFormPage {
 
   readonly availableCategories = computed(() =>
     this.categoryService.getByType(this.type()),
+  );
+
+  // Picker-shaped option arrays for SearchableSelectComponent.
+  readonly categoryPickerOptions = computed<SearchableSelectOption[]>(() =>
+    this.availableCategories().map((c) => ({ id: c.id, label: c.name })),
+  );
+
+  readonly primaryAccountPickerOptions = computed<SearchableSelectOption[]>(() =>
+    this.primaryAccountOptions().map((a) => ({
+      id: a.id,
+      label: a.name,
+      sublabel: ACCOUNT_TYPE_LABEL[a.type],
+    })),
+  );
+
+  readonly fromAccountPickerOptions = computed<SearchableSelectOption[]>(() =>
+    this.nonCreditAccounts().map((a) => ({
+      id: a.id,
+      label: a.name,
+      sublabel: ACCOUNT_TYPE_LABEL[a.type],
+    })),
+  );
+
+  readonly toAccountPickerOptions = computed<SearchableSelectOption[]>(() => {
+    const from = this.fromAccountId();
+    return this.nonCreditAccounts().map((a) => ({
+      id: a.id,
+      label: a.name,
+      sublabel: ACCOUNT_TYPE_LABEL[a.type],
+      disabled: a.id === from,
+    }));
+  });
+
+  readonly owingAccountPickerOptions = computed<SearchableSelectOption[]>(() =>
+    this.owingAccountOptions().map((a) => ({
+      id: a.id,
+      label: a.name,
+      sublabel: ACCOUNT_TYPE_LABEL[a.type],
+    })),
   );
 
   readonly selectedAccount = computed(() => {

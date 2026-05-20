@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Transparent background; Android adaptive icon composes this over icon-background -->
+  <!-- Safe zone for adaptive icons is ~66% (centered 660x660); design stays inside that -->
+
+  <!-- Stem -->
+  <path d="M 512 800 L 512 480"
+        stroke="#c89e6b" stroke-width="22" stroke-linecap="round" fill="none"/>
+
+  <!-- Ground curl -->
+  <path d="M 460 800 Q 512 818, 564 800"
+        stroke="#c89e6b" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- Left leaf -->
+  <g transform="rotate(-32 392 432)">
+    <ellipse cx="392" cy="432" rx="138" ry="80" fill="#d97a3c"/>
+    <line x1="262" y1="432" x2="522" y2="432"
+          stroke="#3d2418" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+  </g>
+
+  <!-- Right leaf -->
+  <g transform="rotate(32 632 432)">
+    <ellipse cx="632" cy="432" rx="138" ry="80" fill="#e9b067"/>
+    <line x1="502" y1="432" x2="762" y2="432"
+          stroke="#3d2418" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+  </g>
+</svg>

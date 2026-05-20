@@ -24,6 +24,8 @@ import {
 } from '@ionic/angular/standalone';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { AccountService } from '../../../core/services/account.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { GroupService } from '../../../core/services/group.service';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { AccountType, ReservationEntry, Transaction } from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
@@ -63,6 +65,8 @@ interface DateGroup {
 export class AccountDetailPage {
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
+  private readonly auth = inject(AuthService);
+  private readonly groups = inject(GroupService);
   private readonly router = inject(Router);
   private readonly location = inject(Location);
 
@@ -137,6 +141,23 @@ export class AccountDetailPage {
     return a ? TYPE_LABEL[a.type] : '';
   });
 
+  // §13 — foreign-owner chip. When this account belongs to a group host
+  // (not the current user), surface the host's display name. Null otherwise.
+  readonly foreignOwnerName = computed(() => {
+    const a = this.account();
+    const me = this.auth.currentUser()?.id;
+    if (!a || !me || a.user_id === me) return null;
+    return this.groups.nameFor(a.user_id);
+  });
+
+  // Author chip for a tx row. Null when current user is the author (so the
+  // chip is hidden on own rows). Used by the mutasi list.
+  authorNameOf(tx: Transaction): string | null {
+    const me = this.auth.currentUser()?.id;
+    if (!me || tx.created_by === me) return null;
+    return this.groups.nameFor(tx.created_by);
+  }
+
   // Hutang chip — non-credit accounts only. Credit cards surface debt via
   // their negative `balance`, so the chip would duplicate.
   readonly debtAmount = computed(() => {
@@ -153,6 +174,17 @@ export class AccountDetailPage {
     const gap = a.total_reserved - a.balance;
     return gap > 0 ? gap : 0;
   });
+
+  readonly shortfallPopoverOpen = signal(false);
+
+  toggleShortfallPopover(event: Event): void {
+    event.stopPropagation();
+    this.shortfallPopoverOpen.update((v) => !v);
+  }
+
+  closeShortfallPopover(): void {
+    this.shortfallPopoverOpen.set(false);
+  }
 
   readonly availableCredit = computed(() => {
     const a = this.account();

@@ -40,6 +40,22 @@
           Setiap transaksi, satu paragraf.
         </p>
 
+        @if (!reorderMode()) {
+          <div class="mt-5 flex flex-wrap gap-1.5">
+            @for (opt of scopeOptions; track opt.value) {
+              <button
+                type="button"
+                (click)="setScope(opt.value)"
+                [class]="scope() === opt.value
+                  ? 'rounded-full px-3.5 py-1 text-xs font-semibold transition bg-on-dark text-ink'
+                  : 'rounded-full px-3.5 py-1 text-xs font-semibold transition bg-on-dark/10 text-on-dark-soft hover:bg-on-dark/15'"
+              >
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+        }
+
         <div class="mt-6 flex flex-wrap gap-2">
           <button
             type="button"
@@ -205,6 +221,26 @@
               >
                 {{ signFor(tx) }}{{ tx.amount | currencyFormat }}
               </span>
+
+              @if (!reorderMode() && authorNameOf(tx)) {
+                <span
+                  class="inline-flex items-center gap-1 rounded-full bg-chip-cream-bg text-chip-cream-ink text-[10px] font-semibold px-2 py-0.5 max-w-[8rem]"
+                >
+                  <svg
+                    class="w-2.5 h-2.5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21a8 8 0 0 1 16 0" />
+                  </svg>
+                  <span class="truncate">{{ authorNameOf(tx) }}</span>
+                </span>
+              }
 
               @if (!reorderMode() && isSplit(tx)) {
               <button

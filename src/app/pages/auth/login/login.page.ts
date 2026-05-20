@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { IonContent } from '@ionic/angular/standalone';
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from '../../../../environments/environment';
 
 type Mode = 'signin' | 'signup';
 
@@ -23,6 +24,12 @@ export class LoginPage {
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly infoMessage = signal<string | null>(null);
+  readonly showPassword = signal(false);
+  readonly version = environment.version;
+
+  togglePasswordVisibility(): void {
+    this.showPassword.update((v) => !v);
+  }
 
   readonly canSubmit = computed(() => {
     const email = this.email().trim();

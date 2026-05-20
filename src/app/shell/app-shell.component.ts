@@ -1,9 +1,12 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { IonRouterOutlet } from '@ionic/angular/standalone';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { filter, map } from 'rxjs';
+import { AccountService } from '../core/services/account.service';
+import { AuthService } from '../core/services/auth.service';
+import { GroupService } from '../core/services/group.service';
 
 type Tab = 'dashboard' | 'accounts' | 'transactions' | 'profile';
 
@@ -22,6 +25,26 @@ const TOP_LEVEL: ReadonlySet<string> = new Set([
 })
 export class AppShellComponent {
   private router = inject(Router);
+  private auth = inject(AuthService);
+  private groups = inject(GroupService);
+  private accounts = inject(AccountService);
+
+  // Auto-bind on login: claim any pending group invitations addressed to
+  // this user's email, then load group membership data (so foreign-author
+  // annotations have names to display) and refresh accounts. Runs once per
+  // session boot. §13.5.
+  private claimedThisSession = false;
+  private readonly _autoBind = effect(async () => {
+    const uid = this.auth.currentUser()?.id;
+    if (!uid || this.claimedThisSession) return;
+    this.claimedThisSession = true;
+    const claimed = await this.groups.claimPendingInvitations();
+    await this.groups.loadAll();
+    if (claimed > 0) {
+      await this.accounts.loadAccounts();
+      await this.accounts.loadAllAccounts();
+    }
+  });
 
   readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -48,6 +71,15 @@ export class AppShellComponent {
   readonly fabExpanded = signal(false);
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
   private longPressFired = false;
+
+  // Stagger choreography: opening blooms bottom→top (index 3 first, index 0 last);
+  // closing collapses top→bottom (index 0 first, index 3 last). The visual effect
+  // is items "sprouting" out of the FAB and "falling back" into it.
+  itemDelay(index: number): string {
+    return this.fabExpanded()
+      ? `${(3 - index) * 55}ms`
+      : `${index * 35}ms`;
+  }
 
   private stripQuery(url: string): string {
     const q = url.indexOf('?');
