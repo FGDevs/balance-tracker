@@ -40,6 +40,12 @@ yarn-error.log
 /src/environments/environment.ts
 /src/environments/environment.prod.ts
 
+# Supabase CLI local state — project ref, pooler URL, version markers.
+/supabase/.temp/
+
+# Claude Code local settings (per-machine permissions).
+/.claude/settings.local.json
+
 # IDEs and editors
 .idea/
 .project

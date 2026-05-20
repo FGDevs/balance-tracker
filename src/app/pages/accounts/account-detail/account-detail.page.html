@@ -459,7 +459,7 @@
                     <span
                       class="inline-block w-4 h-4 border-2 border-ink/15 border-t-accent rounded-full animate-spin"
                     ></span>
-                    Memuat reservasi&hellip;
+                    Memuat hutang&hellip;
                   </div>
                 } @else {
                   @for (entry of unsettled(); track entry.kind + '-' + entry.id) {
@@ -495,7 +495,7 @@
                     <div
                       class="px-5 py-6 text-center text-sm text-ink-muted"
                     >
-                      Tidak ada reservasi.
+                      Tidak ada hutang.
                     </div>
                   }
                 }
@@ -680,7 +680,7 @@
                         <span
                           class="shrink-0 inline-flex items-center rounded-full bg-chip-amber-bg text-chip-amber-ink text-[10px] font-semibold px-2 py-0.5 tracking-wide"
                         >
-                          reservasi
+                          hutang
                         </span>
                       }
                       @if (tx.items && tx.items.length > 1) {

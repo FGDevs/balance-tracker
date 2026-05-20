@@ -29,6 +29,13 @@ interface DateGroup {
   items: Transaction[];
 }
 
+interface CalendarCell {
+  iso: string;
+  day: number;
+  inMonth: boolean;
+  isToday: boolean;
+}
+
 @Component({
   selector: 'app-transaction-list',
   standalone: true,
@@ -86,6 +93,52 @@ export class TransactionListPage {
   readonly originalSnapshot = signal<Transaction[] | null>(null);
   readonly saving = signal(false);
 
+  // ── Calendar state ──────────────────────────────────────────────────────
+  private readonly today = this.localIsoToday();
+  readonly selectedDate = signal<string | null>(this.today);
+  readonly viewedMonth = signal<{ year: number; month: number }>(
+    this.parseMonth(this.today),
+  );
+  readonly monthDots = signal<ReadonlySet<string>>(new Set());
+  readonly pickerOpen = signal(false);
+  readonly pickerYear = signal<number>(this.parseMonth(this.today).year);
+
+  readonly weekdays = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  readonly monthShortNames = Array.from({ length: 12 }, (_, i) =>
+    new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(
+      new Date(2000, i, 1),
+    ),
+  );
+
+  readonly monthLabel = computed(() => {
+    const { year, month } = this.viewedMonth();
+    return new Intl.DateTimeFormat('id-ID', {
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date(year, month, 1));
+  });
+
+  readonly calendarCells = computed<CalendarCell[]>(() => {
+    const { year, month } = this.viewedMonth();
+    const first = new Date(year, month, 1);
+    const dowMon0 = (first.getDay() + 6) % 7;
+    const start = new Date(year, month, 1 - dowMon0);
+    const todayIso = this.today;
+    const cells: CalendarCell[] = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const iso = this.toIso(d);
+      cells.push({
+        iso,
+        day: d.getDate(),
+        inMonth: d.getMonth() === month,
+        isToday: iso === todayIso,
+      });
+    }
+    return cells;
+  });
+
   readonly isDirty = computed(() => {
     const orig = this.originalSnapshot();
     if (!orig) return false;
@@ -120,28 +173,42 @@ export class TransactionListPage {
   });
 
   constructor() {
-    void this.loadFirstPage();
-    // Reload when the viewer scope changes. Watching `scope` only — initial
-    // call above already covers first paint.
-    let firstScopeRun = true;
+    void this.reloadList();
+    void this.reloadDots();
+    // Reload list on scope or selected-date change. Skip first run — constructor
+    // already kicked it off.
+    let firstListRun = true;
     effect(() => {
-      const _ = this.scope();
-      if (firstScopeRun) {
-        firstScopeRun = false;
+      this.scope();
+      this.selectedDate();
+      if (firstListRun) {
+        firstListRun = false;
         return;
       }
-      void this.loadFirstPage();
+      void this.reloadList();
+    });
+    // Reload dots on scope or viewed-month change. Skip first run.
+    let firstDotsRun = true;
+    effect(() => {
+      this.scope();
+      this.viewedMonth();
+      if (firstDotsRun) {
+        firstDotsRun = false;
+        return;
+      }
+      void this.reloadDots();
     });
   }
 
   ionViewWillEnter(): void {
-    void this.loadFirstPage();
+    void this.reloadList();
+    void this.reloadDots();
   }
 
   async onRefresh(event: RefresherCustomEvent): Promise<void> {
     await Haptics.impact({ style: ImpactStyle.Light });
     try {
-      await this.loadFirstPage();
+      await Promise.all([this.reloadList(), this.reloadDots()]);
     } finally {
       event.target.complete();
     }
@@ -149,6 +216,11 @@ export class TransactionListPage {
 
   async onInfinite(event: InfiniteScrollCustomEvent): Promise<void> {
     try {
+      // Date-filtered view is bounded — no pagination.
+      if (this.selectedDate()) {
+        this.hasMore.set(false);
+        return;
+      }
       const next = this.page() + 1;
       const rows = await this.transactionService.getAll(next);
       this.transactions.update((curr) => [...curr, ...rows]);
@@ -168,6 +240,78 @@ export class TransactionListPage {
   async onImportClick(): Promise<void> {
     await Haptics.impact({ style: ImpactStyle.Light });
     void this.router.navigate(['/transactions/import']);
+  }
+
+  // ── Calendar interactions ───────────────────────────────────────────────
+  prevMonth(): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    this.viewedMonth.update(({ year, month }) => {
+      const d = new Date(year, month - 1, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  }
+
+  nextMonth(): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    this.viewedMonth.update(({ year, month }) => {
+      const d = new Date(year, month + 1, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  }
+
+  togglePicker(): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    if (!this.pickerOpen()) {
+      this.pickerYear.set(this.viewedMonth().year);
+    }
+    this.pickerOpen.update((v) => !v);
+  }
+
+  prevYear(): void {
+    this.pickerYear.update((y) => y - 1);
+  }
+
+  nextYear(): void {
+    this.pickerYear.update((y) => y + 1);
+  }
+
+  pickMonth(month: number): void {
+    void Haptics.impact({ style: ImpactStyle.Light });
+    this.viewedMonth.set({ year: this.pickerYear(), month });
+    this.pickerOpen.set(false);
+  }
+
+  async selectDate(cell: CalendarCell): Promise<void> {
+    if (!cell.inMonth) return;
+    if (this.selectedDate() === cell.iso) return;
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.selectedDate.set(cell.iso);
+  }
+
+  async clearSelection(): Promise<void> {
+    if (this.selectedDate() === null) return;
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.selectedDate.set(null);
+  }
+
+  cellClasses(cell: CalendarCell): string {
+    const base =
+      'relative flex items-center justify-center w-full aspect-square text-xs tabular-nums rounded-full transition';
+    if (!cell.inMonth) {
+      return `${base} text-ink-muted/30`;
+    }
+    const isSelected = this.selectedDate() === cell.iso;
+    if (isSelected) {
+      return `${base} bg-accent text-on-dark font-semibold`;
+    }
+    if (cell.isToday) {
+      return `${base} text-ink ring-1 ring-accent-warm`;
+    }
+    return `${base} text-ink hover:bg-app active:scale-95`;
+  }
+
+  hasDot(cell: CalendarCell): boolean {
+    return cell.inMonth && this.monthDots().has(cell.iso);
   }
 
   enterReorderMode(): void {
@@ -199,7 +343,7 @@ export class TransactionListPage {
       await this.transactionService.setSortIndices(updates);
       this.originalSnapshot.set(null);
       this.reorderMode.set(false);
-      await this.loadFirstPage();
+      await this.reloadList();
     } catch (err) {
       this.errorMessage.set(
         err instanceof Error ? err.message : 'Gagal menyimpan urutan',
@@ -316,14 +460,21 @@ export class TransactionListPage {
     return `${weekday} · ${full}`;
   }
 
-  private async loadFirstPage(): Promise<void> {
+  private async reloadList(): Promise<void> {
     this.loading.set(true);
     this.errorMessage.set(null);
     this.page.set(0);
     try {
-      const rows = await this.transactionService.getAll(0);
-      this.transactions.set(rows);
-      this.hasMore.set(rows.length === TransactionService.PAGE_SIZE);
+      const date = this.selectedDate();
+      if (date) {
+        const rows = await this.transactionService.getByDate(date);
+        this.transactions.set(rows);
+        this.hasMore.set(false);
+      } else {
+        const rows = await this.transactionService.getAll(0);
+        this.transactions.set(rows);
+        this.hasMore.set(rows.length === TransactionService.PAGE_SIZE);
+      }
     } catch (err) {
       this.errorMessage.set(
         err instanceof Error ? err.message : 'Gagal memuat transaksi',
@@ -331,5 +482,33 @@ export class TransactionListPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private async reloadDots(): Promise<void> {
+    try {
+      const { year, month } = this.viewedMonth();
+      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const set = await this.transactionService.getTransactionDatesForMonth(key);
+      this.monthDots.set(set);
+    } catch {
+      // Dots are decorative — swallow load errors so the page still renders.
+      this.monthDots.set(new Set());
+    }
+  }
+
+  private localIsoToday(): string {
+    return this.toIso(new Date());
+  }
+
+  private toIso(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private parseMonth(iso: string): { year: number; month: number } {
+    const [y, m] = iso.split('-').map(Number);
+    return { year: y, month: m - 1 };
   }
 }

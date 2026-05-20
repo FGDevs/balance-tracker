@@ -103,6 +103,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'statistics',
+        loadComponent: () =>
+          import('./pages/statistics/statistics.page').then(
+            (m) => m.StatisticsPage,
+          ),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./pages/profile/profile.page').then((m) => m.ProfilePage),

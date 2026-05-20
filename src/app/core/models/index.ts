@@ -150,6 +150,28 @@ export interface Tag {
   name: string;
 }
 
+// §14 Statistics — one row of the expense-by-category breakdown.
+// `category` is null for the synthetic "Tanpa kategori" bucket.
+// `total` is summed across both parent-level (no items) and item-level rows.
+// `share` is total / sumOfAllTotals, computed by the service so the page just renders.
+export interface CategoryBreakdownEntry {
+  category: Category | null;
+  total: number;
+  count: number;
+  share: number;
+}
+
+// §14 Statistics — one row of the current-state reservation summary.
+// Grouped by `reserved_from_account_id` (the owing account).
+// `totalReserved` matches `account_balances.total_reserved` for that account
+// modulo viewer-scope filtering.
+export interface ReservationSummaryEntry {
+  account: Account;
+  totalReserved: number;
+  count: number;
+  oldestDate: string;
+}
+
 // One row extracted from a bank screenshot, awaiting user review (see §9 Transaction Import).
 // `note` is prefilled with the LLM's cleaned-up label and is user-editable — it becomes
 // the saved transaction's `note` column verbatim. `rawDescription` is the verbatim text

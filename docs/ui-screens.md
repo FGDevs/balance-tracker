@@ -83,6 +83,15 @@
 - **Reorder mode**: the hero has an "Atur urutan" pill. While inactive, the list behaves normally. Tapping it enters reorder mode: the pill is replaced by **Batal** + **Simpan** buttons, the rincian chip is hidden, and each row reveals a drag-handle (`⋮⋮` grip) on the right via `@angular/cdk/drag-drop`. Each date group is its own `cdkDropList`; drags are locked to the y-axis and can't cross date groups. Drops mutate page-local state only — Simpan computes new `sort_index` values per dirty date group (reusing that group's existing slot values, sorted descending, assigned to the new row order) and persists everything in one `setSortIndices` call before reloading. Batal restores the snapshot taken on entry. Simpan is disabled until an actual reorder has happened. Tapping a row no longer navigates to edit while in reorder mode.
 - **Reservation chips on the row** (mutually exclusive): `reservasi` (amber) when *all* items reserved OR parent-level reservation set; `parsial reservasi` (amber, distinct text) when *some-but-not-all* items reserved. No chip when nothing is reserved.
 - Tapping the rincian chip toggles an inline expand panel showing each item's category + amount + (if reserved) `→ <owing account>` coral hint + note. Tapping anywhere else on the row navigates to `/transactions/:id/edit`.
+- **Calendar strip** between the hero and the rows. Plain HTML + Tailwind — no Ionic calendar component.
+  - Header row: `‹` prev-month button · month+year label (tappable) · `›` next-month button. Arrows step one calendar month; label tap opens an inline picker panel below the strip with a 12-month chip grid (Jan–Des) + a year stepper (`‹ year ›`). Picking a month closes the panel.
+  - Weekday header row: `Sen Sel Rab Kam Jum Sab Min` (id-ID, Monday-first).
+  - 6-week fixed grid of date cells. Leading/trailing cells from adjacent months are dimmed and not selectable. Today gets an accent-warm ring; the selected date gets a filled accent pill.
+  - **Dot indicator**: each in-month date with ≥1 visible transaction renders a small dot under the day number. Dot color is a neutral accent — does not encode type. Loaded once per month-view via `TransactionService.getTransactionDatesForMonth`.
+  - **Selection**: default is today (today's month, today selected) so the list pre-filters to today on first paint. Tapping another date re-fetches the list via `TransactionService.getByDate`. Tapping the currently-selected date is a no-op. A `Semua tanggal` ghost button below the grid clears selection and restores the original paged feed.
+  - Changing viewer scope reloads both the dot set and the date-filtered list.
+  - **Reorder mode**: calendar is hidden while reorder mode is active (drag-and-drop semantics already disable cross-date moves).
+  - Pagination: when a specific date is selected, `ion-infinite-scroll` is disabled (a single day fits in one fetch). When `Semua tanggal` is active, paging works as before.
 
 ## Calculator
 - Route `/calculator`, lazy-loaded inside `AppShellComponent`. Tab bar hidden (sub-page). Opened from the FAB long-press menu (Kalkulator pill).

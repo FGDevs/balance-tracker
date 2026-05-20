@@ -38,6 +38,15 @@ type ItemInput = Omit<TransactionItem,
 getByAccount(accountId: number, page?: number): Promise<Transaction[]>
 getRecent(limit: number): Promise<Transaction[]>
 
+// Transaction List calendar — all transactions on a specific local date, sorted
+// by (sort_index DESC, id DESC). No pagination (single day is bounded). Honors viewer scope.
+getByDate(date: string /* 'YYYY-MM-DD' */): Promise<Transaction[]>
+
+// Transaction List calendar — set of 'YYYY-MM-DD' dates within the given
+// 'YYYY-MM' month that have ≥1 visible transaction. Used to render the dot
+// indicator under each in-month day cell. Honors viewer scope.
+getTransactionDatesForMonth(month: string /* 'YYYY-MM' */): Promise<Set<string>>
+
 // Bulk-apply new sort_index values. The drag-drop reorder UI batches all
 // changes locally and calls this once on Save. No-op when updates is empty.
 setSortIndices(updates: { id: number; sort_index: number }[]): Promise<void>
@@ -195,4 +204,4 @@ All list-fetching services read `ViewerScopeService.scope()` and apply:
 - `'others'` → `.neq('created_by', auth.uid())`
 - `'all'`    → no filter
 
-Applies to: `AccountService.loadAccounts`, `TransactionService.getAll` / `getByAccount` / `getRecent` / `getForCalculator`. The mutasi list on Account Detail (already scoped to `account_id`) ignores this filter — the page surfaces *all* mutations of that account regardless of who created them.
+Applies to: `AccountService.loadAccounts`, `TransactionService.getAll` / `getByAccount` / `getRecent` / `getByDate` / `getTransactionDatesForMonth` / `getForCalculator`. The mutasi list on Account Detail (already scoped to `account_id`) ignores this filter — the page surfaces *all* mutations of that account regardless of who created them.

@@ -1,0 +1,319 @@
+<ion-content [fullscreen]="true">
+  <ion-refresher
+    slot="fixed"
+    (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="min-h-full bg-app font-sans pb-20">
+    <!-- Hero -->
+    <section class="relative overflow-hidden bg-hero text-on-dark px-5 pt-10 pb-8 rounded-b-3xl">
+      <div class="pointer-events-none absolute -top-20 -right-16 w-64 h-64 rounded-full bg-accent/15 blur-3xl"></div>
+      <div
+        class="pointer-events-none absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-chip-sky-bg/10 blur-3xl"></div>
+
+      <div class="relative max-w-md mx-auto">
+        <div class="flex items-center justify-between">
+          <button
+            type="button"
+            (click)="goBack()"
+            class="inline-flex items-center gap-1.5 text-on-dark-soft text-sm font-medium active:opacity-70 transition"
+            aria-label="Kembali">
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            Kembali
+          </button>
+          <span class="block w-1.5 h-1.5 rounded-full bg-accent-warm"></span>
+        </div>
+
+        <div class="mt-7">
+          <div class="flex items-center gap-2.5">
+            <span class="block h-px w-5 bg-accent-warm"></span>
+            <p class="text-[11px] tracking-[0.22em] uppercase text-on-dark-soft font-semibold">Tinjauan</p>
+          </div>
+          <h1 class="font-display text-[2.4rem] leading-[1.05] mt-3">
+            Statistik
+            <span class="italic text-accent-warm">ringkas.</span>
+          </h1>
+          <p class="font-display italic text-on-dark-soft text-sm mt-3">
+            Ke mana uang pergi, apa yang masih harus dilunasi.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters card -->
+    <div class="px-5 -mt-4 relative z-10">
+      <div class="bg-card rounded-2xl shadow-card p-5 max-w-md mx-auto space-y-5">
+        <!-- Akun -->
+        <div>
+          <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-2">Akun</p>
+          <app-searchable-select
+            [options]="accountOptions()"
+            [value]="accountId()"
+            (valueChange)="onAccountChange($event)"
+            placeholder="Semua akun"
+            modalTitle="Pilih akun"
+            modalEyebrow="Akun"
+            searchPlaceholder="Cari akun..."
+            emptyMessage="Akun tidak ditemukan."
+            [allowClear]="true" />
+        </div>
+
+        <!-- Periode -->
+        <div>
+          <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-3">Periode</p>
+          <div class="flex flex-wrap gap-2">
+            @for (p of presets; track p.value) {
+            <button
+              type="button"
+              (click)="pickPreset(p.value)"
+              [class]="
+                datePreset() === p.value
+                  ? 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-ink text-on-dark'
+                  : 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-transparent text-ink border border-ink/15'
+              ">
+              {{ p.label }}
+            </button>
+            }
+          </div>
+
+          @if (datePreset() === 'custom') {
+          <div class="grid grid-cols-2 gap-3 mt-3">
+            <label class="flex flex-col gap-1">
+              <span class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Dari </span>
+              <input
+                type="date"
+                [value]="dateFrom()"
+                (change)="onDateFromChange($any($event.target).value)"
+                class="rounded-xl bg-card border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-[10px] tracking-[0.18em] uppercase text-ink-muted font-semibold"> Sampai </span>
+              <input
+                type="date"
+                [value]="dateTo()"
+                (change)="onDateToChange($any($event.target).value)"
+                class="rounded-xl bg-card border border-ink/10 px-3 py-2.5 text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+            </label>
+          </div>
+          } @else {
+          <p class="font-display italic text-xs text-ink-muted mt-3">{{ dateFrom() }} &ndash; {{ dateTo() }}</p>
+          }
+        </div>
+
+        <!-- Penulis (viewer scope) -->
+        <div>
+          <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-3">Penulis</p>
+          <div class="flex flex-wrap gap-2">
+            @for (opt of scopeOptions; track opt.value) {
+            <button
+              type="button"
+              (click)="setScope(opt.value)"
+              [class]="
+                scope() === opt.value
+                  ? 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-ink text-on-dark'
+                  : 'rounded-full px-4 py-1.5 text-sm font-medium transition bg-transparent text-ink border border-ink/15'
+              ">
+              {{ opt.label }}
+            </button>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @if (errorMessage()) {
+    <div class="px-5 mt-5 max-w-md mx-auto">
+      <p class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug">
+        {{ errorMessage() }}
+      </p>
+    </div>
+    }
+
+    <!-- Section: Rincian kategori -->
+    <section class="px-5 mt-8 max-w-md mx-auto">
+      <div class="flex items-end justify-between mb-3 gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="block h-px w-4 bg-accent"></span>
+          <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">
+            Pengeluaran &middot; kategori
+          </p>
+        </div>
+        @if (totalExpense() > 0) {
+        <p class="font-display text-sm text-ink">
+          {{ totalExpense() | currencyFormat : currency() }}
+        </p>
+        }
+      </div>
+
+      @if (loading() && breakdown().length === 0) {
+      <div class="bg-card rounded-2xl shadow-card p-8 flex justify-center">
+        <span class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"></span>
+      </div>
+      } @else if (breakdown().length === 0) {
+      <div class="bg-card rounded-2xl shadow-card p-7 text-center">
+        <div
+          class="mx-auto mb-4 w-12 h-12 rounded-2xl bg-chip-cream-bg flex items-center justify-center text-chip-cream-ink">
+          <svg
+            class="w-6 h-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M3 3v18h18" />
+            <path d="M7 15l4-4 4 3 4-6" />
+          </svg>
+        </div>
+        <p class="font-display text-lg text-ink">Belum ada pengeluaran di periode ini.</p>
+        <p class="text-sm text-ink-soft mt-1.5 max-w-[18rem] mx-auto leading-relaxed">
+          Coba ubah periode atau pilih akun lain.
+        </p>
+      </div>
+      } @else {
+      <div class="bg-card rounded-2xl shadow-card overflow-hidden">
+        @for (entry of breakdown(); track entry.category?.id ?? 'none') {
+        <div class="px-4 py-3.5 border-b border-ink/5 last:border-b-0">
+          <div class="flex items-center gap-3">
+            <span
+              class="shrink-0 w-2.5 h-2.5 rounded-full"
+              [style.background]="entry.category?.color || 'var(--color-chip-cream-ink)'"></span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-medium text-ink truncate">
+                  {{ entry.category?.name ?? "Tanpa kategori" }}
+                </p>
+                <p class="font-display text-base text-ink shrink-0">
+                  {{ entry.total | currencyFormat : currency() }}
+                </p>
+              </div>
+              <div class="mt-1.5 flex items-center gap-3">
+                <div class="flex-1 h-1 rounded-full bg-ink/5 overflow-hidden">
+                  <div
+                    class="h-full bg-accent rounded-full"
+                    [style.width]="(entry.share * 100) + '%'"></div>
+                </div>
+                <p class="text-[11px] text-ink-muted font-medium shrink-0 tabular-nums">
+                  {{ sharePercent(entry.share) }} &middot; {{ entry.count }}×
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        }
+      </div>
+      }
+    </section>
+
+    <!-- Section: Hutang -->
+    <section class="px-5 mt-8 max-w-md mx-auto">
+      <div class="flex items-end justify-between mb-3 gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="block h-px w-4 bg-chip-coral-ink"></span>
+          <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">
+            Hutang &middot; saat ini
+          </p>
+        </div>
+        @if (totalReserved() > 0) {
+        <p class="font-display text-sm text-chip-coral-ink">
+          {{ totalReserved() | currencyFormat : currency() }}
+        </p>
+        }
+      </div>
+
+      @if (reservations().length === 0) {
+      <div class="bg-card rounded-2xl shadow-card p-7 text-center">
+        <div
+          class="mx-auto mb-4 w-12 h-12 rounded-2xl bg-chip-green-bg flex items-center justify-center text-chip-green-ink">
+          <svg
+            class="w-6 h-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <p class="font-display text-lg text-ink">Tidak ada hutang aktif.</p>
+        @if (selectedAccountName(); as name) {
+        <p class="text-sm text-ink-soft mt-1.5 max-w-[18rem] mx-auto leading-relaxed">
+          {{ name }} tidak menyimpan hutang yang belum dilunasi.
+        </p>
+        }
+      </div>
+      } @else {
+      <div class="bg-card rounded-2xl shadow-card overflow-hidden">
+        @for (entry of reservations(); track entry.account.id) {
+        <button
+          type="button"
+          (click)="openOwingAccount(entry.account.id)"
+          class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-ink/5 last:border-b-0 active:bg-app/40 transition">
+          <span
+            class="shrink-0 w-9 h-9 rounded-xl bg-chip-coral-bg text-chip-coral-ink flex items-center justify-center">
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round">
+              <circle
+                cx="12"
+                cy="12"
+                r="10" />
+              <line
+                x1="12"
+                y1="8"
+                x2="12"
+                y2="12" />
+              <line
+                x1="12"
+                y1="16"
+                x2="12.01"
+                y2="16" />
+            </svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-ink truncate">
+                {{ entry.account.name }}
+              </p>
+              <p class="font-display text-base text-chip-coral-ink shrink-0">
+                {{ entry.totalReserved | currencyFormat : currency() }}
+              </p>
+            </div>
+            <p class="text-[11px] text-ink-muted mt-0.5 truncate">
+              {{ entry.count }} hutang &middot; tertua {{ formatDate(entry.oldestDate) }}
+            </p>
+          </div>
+          <svg
+            class="w-4 h-4 text-ink-muted shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+        }
+      </div>
+      }
+    </section>
+  </div>
+</ion-content>

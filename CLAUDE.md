@@ -333,3 +333,44 @@ Quick reference for rules in §3 / §7 that depend on it:
 - Services NEVER hand-roll `eq('user_id', auth.uid())` on shared tables — RLS does cross-user visibility. Services MAY filter by `created_by` to honor the viewer-scope toggle.
 - `ViewerScopeService.scope: Signal<'mine' | 'others' | 'all'>` — applied as `.eq/.neq('created_by', uid)` in list-fetching services (Account list, Transaction list / recent / by-account / for-calculator).
 - For `transactions`: `transaction.user_id` always equals `account.user_id` (hard invariant enforced at INSERT). Transfer pairs may have different `user_id` per row but share `created_by`.
+
+---
+
+## 14. Statistics
+
+Route `/statistics`, lazy-loaded inside `AppShellComponent`. Sub-page — tab bar hidden. Entered via a "Statistik" link on Dashboard (placed in the Accounts section header row, beside "Lihat semua").
+
+### Filters
+- **Akun** — single-select via `<app-searchable-select>`. Default `Semua akun`; other options are every non-deleted account the viewer can see (own + foreign-visible, foreign annotated with `· {ownerName}`). Filter applies to `transactions.account_id` (physical-payer perspective, same as Calculator).
+- **Periode** — preset pill row: `Bulan ini` (default), `Bulan lalu`, `Custom`. `Custom` reveals two `<input type="date">` (from/to, inclusive both ends). The "Reservasi" section ignores this filter — see below.
+- **Penulis** (viewer scope) — same `Saya` / `Lain` / `Semua` pill row as Dashboard, bound to `ViewerScopeService.scope`. Applies to the category breakdown via `created_by` filter. The reservation summary also honors it (entries created by others are filtered out when scope = `Saya`).
+
+### Section 1 — Rincian kategori (expense only)
+- Lists categories ranked descending by total expense within the period (and within the selected account if not `Semua`).
+- Each row: category color dot + name, count of contributing rows, total, share %.
+- **Items handling**: when a transaction has items (`SUM(items.amount) = parent.amount` invariant), each item contributes to its own `category_id`. When no items, the parent's `category_id` is used. Rows with `category_id IS NULL` and no items render under a synthetic "Tanpa kategori" bucket.
+- **Settled vs unsettled**: both included. A settled debt was still a real expense at the time it happened.
+- **Transfers**: excluded entirely (no category).
+- Empty state: cream chip card "Belum ada pengeluaran di periode ini."
+
+### Section 2 — Reservasi & hutang (current state, ignores period filter)
+- Headline number: total currently reserved across the viewer-visible scope (matches the dashboard `Hutang aktif` number when account = `Semua`).
+- When account = `Semua`: list of owing accounts with `total_reserved > 0`, each row showing `{account name} · Rp {total}` + secondary line `{n} reservasi · tertua {date}`.
+- When account = specific: single summary block — `{total_reserved}` for that account (perspective = what this account owes others), count of unsettled entries, oldest unsettled date. Mirrors the Account Detail "Hutang" chip data but expanded.
+- Row "tertua" date uses `id-ID` long format. Tapping a row navigates to that owing account's detail page.
+- Empty state: cream chip card "Tidak ada hutang aktif."
+
+### Implementation notes
+- New service methods on `TransactionService`:
+  - `getCategoryBreakdown({ from, to, accountId }): Promise<CategoryBreakdownEntry[]>` — non-transfer rows in `[from, to]`, expands items where present, groups by `category_id`, honors viewer scope via `created_by`.
+  - `getReservationSummary({ accountId }): Promise<ReservationSummaryEntry[]>` — UNION of parent-level + item-level unsettled reservations, grouped by `reserved_from_account_id`, returns `{ account, totalReserved, count, oldestDate }[]`. Honors viewer scope.
+- New types in `src/app/core/models/index.ts`: `CategoryBreakdownEntry`, `ReservationSummaryEntry`.
+- Page uses only `ion-content` + `ion-refresher` from Ionic; everything else plain HTML + Tailwind.
+- Money formatted via `currencyFormat` pipe + `AuthService.currency()`.
+
+### Out of scope for this iteration
+- Charts (bar/pie/line) — text rows + share % only.
+- Balance trend over time — deferred.
+- Income breakdown — only expense supported.
+- Settled-in-period view — only current-state debt is shown.
+- Export.

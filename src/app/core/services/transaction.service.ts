@@ -1,6 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import {
+  Account,
+  Category,
+  CategoryBreakdownEntry,
   ReservationEntry,
+  ReservationSummaryEntry,
   Transaction,
   TransactionItem,
 } from '../models';
@@ -70,6 +74,50 @@ export class TransactionService {
     const { data, error } = await q;
     if (error) throw error;
     return this.normalize((data ?? []) as Transaction[]);
+  }
+
+  // Transaction List calendar — all transactions on a specific local date,
+  // sorted by (sort_index DESC, id DESC). No pagination (single day is bounded).
+  // Honors viewer scope.
+  async getByDate(date: string): Promise<Transaction[]> {
+    let q = this.supabase
+      .getClient()
+      .from('transactions')
+      .select(TX_SELECT)
+      .eq('date', date)
+      .order('sort_index', { ascending: false })
+      .order('id', { ascending: false });
+    q = this.applyScope(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    return this.normalize((data ?? []) as Transaction[]);
+  }
+
+  // Transaction List calendar — set of 'YYYY-MM-DD' dates within the given
+  // 'YYYY-MM' month that have ≥1 visible transaction. Drives the dot indicator.
+  // Honors viewer scope.
+  async getTransactionDatesForMonth(month: string): Promise<Set<string>> {
+    const [y, m] = month.split('-').map(Number);
+    if (!y || !m || m < 1 || m > 12) {
+      throw new Error(`Invalid month '${month}', expected 'YYYY-MM'`);
+    }
+    const from = `${month}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const to = `${month}-${String(lastDay).padStart(2, '0')}`;
+    let q = this.supabase
+      .getClient()
+      .from('transactions')
+      .select('date')
+      .gte('date', from)
+      .lte('date', to);
+    q = this.applyScope(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    const set = new Set<string>();
+    for (const row of (data ?? []) as Array<{ date: string }>) {
+      set.add(row.date);
+    }
+    return set;
   }
 
   async getRecent(limit: number): Promise<Transaction[]> {
@@ -179,6 +227,160 @@ export class TransactionService {
     const { data, error } = await q;
     if (error) throw error;
     return this.normalize((data ?? []) as Transaction[]);
+  }
+
+  // §14 Statistics — expense breakdown by category for a date range, optionally
+  // scoped to one payer account. Item-level rows contribute under their own
+  // category; parent-level rows (no items) contribute under parent.category_id.
+  // Honors viewer scope via created_by on parents (items inherit author).
+  async getCategoryBreakdown(opts: {
+    from: string;
+    to: string;
+    accountId?: number | null;
+  }): Promise<CategoryBreakdownEntry[]> {
+    let q = this.supabase
+      .getClient()
+      .from('transactions')
+      .select(TX_SELECT)
+      .eq('type', 'expense')
+      .gte('date', opts.from)
+      .lte('date', opts.to);
+    if (opts.accountId != null) q = q.eq('account_id', opts.accountId);
+    q = this.applyScope(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    const txs = this.normalize((data ?? []) as Transaction[]);
+
+    type Bucket = { category: Category | null; total: number; count: number };
+    const buckets = new Map<number | 'none', Bucket>();
+    const add = (
+      categoryId: number | null | undefined,
+      category: Category | undefined,
+      amount: number,
+    ) => {
+      const key = categoryId == null ? 'none' : categoryId;
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.total += amount;
+        existing.count += 1;
+      } else {
+        buckets.set(key, {
+          category: category ?? null,
+          total: amount,
+          count: 1,
+        });
+      }
+    };
+
+    for (const tx of txs) {
+      if (tx.items && tx.items.length > 0) {
+        for (const item of tx.items) {
+          add(item.category_id, item.category, Number(item.amount));
+        }
+      } else {
+        add(tx.category_id, tx.category, Number(tx.amount));
+      }
+    }
+
+    const totalAll = Array.from(buckets.values()).reduce(
+      (s, b) => s + b.total,
+      0,
+    );
+    return Array.from(buckets.values())
+      .map<CategoryBreakdownEntry>((b) => ({
+        category: b.category,
+        total: Number(b.total.toFixed(2)),
+        count: b.count,
+        share: totalAll > 0 ? b.total / totalAll : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  // §14 Statistics — current-state reservation summary, ignores any period.
+  // Groups unsettled parent-level + item-level reservations by owing account.
+  // When accountId is set, returns at most one entry (for that account).
+  // Honors viewer scope via created_by.
+  async getReservationSummary(opts: {
+    accountId?: number | null;
+  }): Promise<ReservationSummaryEntry[]> {
+    const client = this.supabase.getClient();
+
+    let parentQ = client
+      .from('transactions')
+      .select(
+        'id, amount, date, reserved_from_account:accounts!reserved_from_account_id(*)',
+      )
+      .not('reserved_from_account_id', 'is', null)
+      .is('settlement_id', null);
+    if (opts.accountId != null) {
+      parentQ = parentQ.eq('reserved_from_account_id', opts.accountId);
+    }
+    parentQ = this.applyScope(parentQ);
+    const { data: parentRows, error: parentErr } = await parentQ;
+    if (parentErr) throw parentErr;
+
+    let itemQ = client
+      .from('transaction_items')
+      .select(
+        'id, amount, reserved_from_account:accounts!reserved_from_account_id(*), parent:transactions!transaction_id(date)',
+      )
+      .not('reserved_from_account_id', 'is', null)
+      .is('settlement_id', null);
+    if (opts.accountId != null) {
+      itemQ = itemQ.eq('reserved_from_account_id', opts.accountId);
+    }
+    itemQ = this.applyScope(itemQ);
+    const { data: itemRows, error: itemErr } = await itemQ;
+    if (itemErr) throw itemErr;
+
+    type Acc = {
+      account: Account;
+      totalReserved: number;
+      count: number;
+      oldestDate: string;
+    };
+    const byAccount = new Map<number, Acc>();
+    const add = (acc: Account, amount: number, date: string) => {
+      const existing = byAccount.get(acc.id);
+      if (existing) {
+        existing.totalReserved += amount;
+        existing.count += 1;
+        if (date < existing.oldestDate) existing.oldestDate = date;
+      } else {
+        byAccount.set(acc.id, {
+          account: acc,
+          totalReserved: amount,
+          count: 1,
+          oldestDate: date,
+        });
+      }
+    };
+
+    for (const row of (parentRows ?? []) as unknown as Array<{
+      amount: number;
+      date: string;
+      reserved_from_account: Account | null;
+    }>) {
+      if (!row.reserved_from_account) continue;
+      add(row.reserved_from_account, Number(row.amount), row.date);
+    }
+    for (const row of (itemRows ?? []) as unknown as Array<{
+      amount: number;
+      reserved_from_account: Account | null;
+      parent: { date: string } | null;
+    }>) {
+      if (!row.reserved_from_account || !row.parent) continue;
+      add(row.reserved_from_account, Number(row.amount), row.parent.date);
+    }
+
+    return Array.from(byAccount.values())
+      .map<ReservationSummaryEntry>((a) => ({
+        account: a.account,
+        totalReserved: Number(a.totalReserved.toFixed(2)),
+        count: a.count,
+        oldestDate: a.oldestDate,
+      }))
+      .sort((a, b) => b.totalReserved - a.totalReserved);
   }
 
   async getItems(transactionId: number): Promise<TransactionItem[]> {
