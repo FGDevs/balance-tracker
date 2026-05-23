@@ -104,6 +104,16 @@ getForCalculator(filters: {
   dateFrom: string;   // 'YYYY-MM-DD' inclusive
   dateTo:   string;   // 'YYYY-MM-DD' inclusive
 }): Promise<Transaction[]>
+
+// Transaction Import Review (docs/ui-screens.md): returns all transactions on the
+// picked import account whose date IN the given set. Caller passes the union of
+// `draft.date ± 1` for every draft; page derives per-draft duplicate matches
+// client-side from this single fetch. Sorted (date DESC, sort_index DESC, id DESC).
+// Honors viewer scope. No pagination — bounded by import size.
+getNearbyForImport(params: {
+  accountId: number;
+  dates: string[];   // 'YYYY-MM-DD'; deduped by caller; empty array → []
+}): Promise<Transaction[]>
 ```
 
 ## SettlementService
@@ -204,4 +214,4 @@ All list-fetching services read `ViewerScopeService.scope()` and apply:
 - `'others'` → `.neq('created_by', auth.uid())`
 - `'all'`    → no filter
 
-Applies to: `AccountService.loadAccounts`, `TransactionService.getAll` / `getByAccount` / `getRecent` / `getByDate` / `getTransactionDatesForMonth` / `getForCalculator`. The mutasi list on Account Detail (already scoped to `account_id`) ignores this filter — the page surfaces *all* mutations of that account regardless of who created them.
+Applies to: `AccountService.loadAccounts`, `TransactionService.getAll` / `getByAccount` / `getRecent` / `getByDate` / `getTransactionDatesForMonth` / `getForCalculator` / `getNearbyForImport`. The mutasi list on Account Detail (already scoped to `account_id`) ignores this filter — the page surfaces *all* mutations of that account regardless of who created them.

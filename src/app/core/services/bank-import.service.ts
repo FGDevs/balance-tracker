@@ -63,6 +63,10 @@ export class BankImportService {
       const draft = kept[i];
       const sortIndex = anchor - i;
       const note = draft.note?.trim() || draft.rawDescription || undefined;
+      if (!draft.date) {
+        throw new Error('Tanggal wajib dipilih untuk semua transaksi');
+      }
+      const date = draft.date;
       if (draft.type === 'transfer') {
         if (!draft.transferAccountId) {
           throw new Error('Transfer membutuhkan akun tujuan/asal');
@@ -72,7 +76,7 @@ export class BankImportService {
           fromAccountId: isOut ? params.accountId : draft.transferAccountId,
           toAccountId: isOut ? draft.transferAccountId : params.accountId,
           amount: draft.amount,
-          date: draft.date,
+          date,
           note,
           sortIndex: sortIndex,
         });
@@ -82,7 +86,7 @@ export class BankImportService {
           category_id: draft.suggestedCategoryId,
           amount: draft.amount,
           type: draft.type,
-          date: draft.date,
+          date,
           note,
           sort_index: sortIndex,
         } as Omit<Transaction, 'id' | 'user_id' | 'created_by' | 'created_at'>);

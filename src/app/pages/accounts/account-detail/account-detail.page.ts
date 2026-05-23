@@ -341,9 +341,66 @@ export class AccountDetailPage {
     });
   }
 
+  readonly catatMenuOpen = signal(false);
+  private catatLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private catatLongPressFired = false;
+
+  catatItemDelay(index: number): string {
+    return this.catatMenuOpen()
+      ? `${(1 - index) * 55}ms`
+      : `${index * 35}ms`;
+  }
+
+  onCatatPress(): void {
+    this.catatLongPressFired = false;
+    this.clearCatatLongPressTimer();
+    this.catatLongPressTimer = setTimeout(() => {
+      this.catatLongPressTimer = null;
+      this.catatLongPressFired = true;
+      void Haptics.impact({ style: ImpactStyle.Medium });
+      this.catatMenuOpen.set(true);
+    }, 450);
+  }
+
+  onCatatRelease(): void {
+    this.clearCatatLongPressTimer();
+  }
+
+  private clearCatatLongPressTimer(): void {
+    if (this.catatLongPressTimer !== null) {
+      clearTimeout(this.catatLongPressTimer);
+      this.catatLongPressTimer = null;
+    }
+  }
+
+  onCatatClick(): void {
+    if (this.catatLongPressFired) {
+      this.catatLongPressFired = false;
+      return;
+    }
+    if (this.catatMenuOpen()) {
+      this.catatMenuOpen.set(false);
+      return;
+    }
+    void this.onCreateTransaction();
+  }
+
+  closeCatatMenu(): void {
+    this.catatMenuOpen.set(false);
+  }
+
   async onCreateTransaction(): Promise<void> {
+    this.catatMenuOpen.set(false);
     await Haptics.impact({ style: ImpactStyle.Light });
     void this.router.navigate(['/transactions/new'], {
+      queryParams: { account: this.accountId() },
+    });
+  }
+
+  async onImportTransaction(): Promise<void> {
+    this.catatMenuOpen.set(false);
+    await Haptics.impact({ style: ImpactStyle.Light });
+    void this.router.navigate(['/transactions/import'], {
       queryParams: { account: this.accountId() },
     });
   }

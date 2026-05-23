@@ -204,6 +204,31 @@ export class TransactionService {
     return entries;
   }
 
+  // Transaction Import Review — fetches existing transactions on the picked
+  // import account for the given set of dates (caller passes union of
+  // draft.date ± 1). Page derives per-draft duplicate matches client-side.
+  // Sorted (date DESC, sort_index DESC, id DESC). Honors viewer scope.
+  async getNearbyForImport(params: {
+    accountId: number;
+    dates: string[];
+  }): Promise<Transaction[]> {
+    if (params.dates.length === 0) return [];
+    const unique = Array.from(new Set(params.dates));
+    let q = this.supabase
+      .getClient()
+      .from('transactions')
+      .select(TX_SELECT)
+      .eq('account_id', params.accountId)
+      .in('date', unique)
+      .order('date', { ascending: false })
+      .order('sort_index', { ascending: false })
+      .order('id', { ascending: false });
+    q = this.applyScope(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    return this.normalize((data ?? []) as Transaction[]);
+  }
+
   async getForCalculator(filters: {
     accountIds: number[] | 'all';
     dateFrom: string;

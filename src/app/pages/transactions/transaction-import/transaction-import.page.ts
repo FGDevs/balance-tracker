@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { AccountService } from '../../../core/services/account.service';
@@ -9,10 +9,12 @@ import {
   BankImportError,
   BankImportService,
 } from '../../../core/services/bank-import.service';
+import { TransactionService } from '../../../core/services/transaction.service';
 import {
   ACCOUNT_TYPE_LABEL,
   Category,
   ImportDraft,
+  Transaction,
 } from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
 import {
@@ -21,6 +23,16 @@ import {
 } from '../../../shared/components/searchable-select/searchable-select.component';
 
 type Step = 'account' | 'upload' | 'extracting' | 'review';
+
+function shiftDate(date: string, deltaDays: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
 
 @Component({
   selector: 'app-transaction-import',
@@ -32,14 +44,22 @@ export class TransactionImportPage {
   private readonly accountService = inject(AccountService);
   private readonly categoryService = inject(CategoryService);
   private readonly bankImport = inject(BankImportService);
+  private readonly transactionService = inject(TransactionService);
   private readonly location = inject(Location);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly step = signal<Step>('account');
   readonly accountId = signal<number | null>(null);
   readonly drafts = signal<ImportDraft[]>([]);
   readonly errorMessage = signal<string | null>(null);
   readonly committing = signal(false);
+
+  // Duplicate-hint cache: existing transactions on the picked account keyed by
+  // 'YYYY-MM-DD'. Filled when entering Review for the union of (draft.date ± 1)
+  // and topped up lazily when a user edits a draft date outside the cache.
+  readonly nearbyByDate = signal<Map<string, Transaction[]>>(new Map());
+  readonly expandedDuplicateAt = signal<Set<number>>(new Set());
 
   readonly accounts = computed(() => this.accountService.allAccounts());
   readonly categories = computed(() => this.categoryService.categories());
@@ -85,8 +105,15 @@ export class TransactionImportPage {
     ),
   );
 
+  readonly missingDate = computed(() =>
+    this.drafts().some((d) => !d.skip && !d.date),
+  );
+
   readonly canCommit = computed(
-    () => !this.allSkipped() && !this.missingTransferAccount(),
+    () =>
+      !this.allSkipped() &&
+      !this.missingTransferAccount() &&
+      !this.missingDate(),
   );
 
   constructor() {
@@ -100,6 +127,14 @@ export class TransactionImportPage {
       }
       if (this.categories().length === 0) {
         await this.categoryService.loadCategories();
+      }
+      // Deep-link: ?account=<id> pre-selects the account and skips Step 1.
+      // Silently ignored if the id doesn't match a loaded account.
+      const raw = this.route.snapshot.queryParamMap.get('account');
+      const id = raw ? Number(raw) : NaN;
+      if (Number.isFinite(id) && this.accounts().some((a) => a.id === id)) {
+        this.accountId.set(id);
+        this.step.set('upload');
       }
     } catch (err) {
       this.errorMessage.set(
@@ -127,6 +162,8 @@ export class TransactionImportPage {
     await Haptics.impact({ style: ImpactStyle.Light });
     this.errorMessage.set(null);
     this.step.set('extracting');
+    this.nearbyByDate.set(new Map());
+    this.expandedDuplicateAt.set(new Set());
 
     try {
       const drafts = await this.bankImport.extract({
@@ -140,6 +177,7 @@ export class TransactionImportPage {
       }
       this.drafts.set(drafts);
       this.step.set('review');
+      void this.ensureNearbyForDates(this.unionWindowDates(drafts));
     } catch (err) {
       this.errorMessage.set(
         err instanceof BankImportError
@@ -150,6 +188,90 @@ export class TransactionImportPage {
       );
       this.step.set('upload');
     }
+  }
+
+  private unionWindowDates(drafts: ImportDraft[]): string[] {
+    const set = new Set<string>();
+    for (const d of drafts) {
+      if (!d.date) continue;
+      for (const day of this.windowDatesFor(d.date)) set.add(day);
+    }
+    return [...set];
+  }
+
+  private windowDatesFor(date: string | null): string[] {
+    if (!date) return [];
+    return [shiftDate(date, -1), date, shiftDate(date, 1)];
+  }
+
+  private async ensureNearbyForDates(dates: string[]): Promise<void> {
+    const accountId = this.accountId();
+    if (!accountId) return;
+    const cache = this.nearbyByDate();
+    const missing = dates.filter((d) => !cache.has(d));
+    if (missing.length === 0) return;
+    try {
+      const rows = await this.transactionService.getNearbyForImport({
+        accountId,
+        dates: missing,
+      });
+      const next = new Map(cache);
+      for (const d of missing) next.set(d, []);
+      for (const tx of rows) {
+        const bucket = next.get(tx.date);
+        if (bucket) bucket.push(tx);
+      }
+      this.nearbyByDate.set(next);
+    } catch {
+      // Silent: duplicate hints are advisory; commit + extract paths surface errors.
+    }
+  }
+
+  matchesForDraft(draft: ImportDraft): {
+    exact: Transaction[];
+    nearby: Transaction[];
+  } {
+    if (!draft.date) return { exact: [], nearby: [] };
+    const cache = this.nearbyByDate();
+    const window = this.windowDatesFor(draft.date);
+    const all: Transaction[] = [];
+    for (const d of window) {
+      const bucket = cache.get(d);
+      if (bucket) all.push(...bucket);
+    }
+    const exact: Transaction[] = [];
+    const nearby: Transaction[] = [];
+    for (const tx of all) {
+      if (tx.amount === draft.amount) exact.push(tx);
+      else nearby.push(tx);
+    }
+    return { exact, nearby };
+  }
+
+  isDuplicateExpanded(index: number): boolean {
+    return this.expandedDuplicateAt().has(index);
+  }
+
+  toggleDuplicateExpand(index: number): void {
+    const next = new Set(this.expandedDuplicateAt());
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    this.expandedDuplicateAt.set(next);
+  }
+
+  formatNearbyDate(date: string): string {
+    const d = new Date(date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+    if (diffDays === 0) return 'Hari ini';
+    if (diffDays === 1) return 'Kemarin';
+    if (diffDays === -1) return 'Besok';
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(d);
   }
 
   retryUpload(): void {
@@ -170,7 +292,9 @@ export class TransactionImportPage {
   }
 
   onDateChange(index: number, value: string): void {
-    this.updateDraft(index, { date: value });
+    const next = value || null;
+    this.updateDraft(index, { date: next });
+    if (next) void this.ensureNearbyForDates(this.windowDatesFor(next));
   }
 
   onAmountChange(index: number, value: string): void {

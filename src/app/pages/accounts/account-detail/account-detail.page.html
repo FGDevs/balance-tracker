@@ -377,26 +377,115 @@
           }
         </div>
 
-        <!-- Catat transaksi CTA -->
-        <button
-          type="button"
-          (click)="onCreateTransaction()"
-          class="mt-4 w-full rounded-xl flex bg-accent text-on-dark font-semibold px-5 py-3 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition items-center justify-center gap-2 max-w-md mx-auto"
-        >
-          <svg
-            class="w-4 h-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.25"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+        <!-- Catat transaksi CTA — tap = manual, long-press = menu (Impor / Catat manual) -->
+        <div class="mt-4 relative max-w-md mx-auto">
+          @if (catatMenuOpen()) {
+            <button
+              type="button"
+              (click)="closeCatatMenu()"
+              class="fixed inset-0 z-30 bg-hero/20 backdrop-blur-[2px] cursor-default"
+              aria-label="Tutup menu"
+            ></button>
+          }
+
+          <!-- Long-press menu: blooms upward from the CTA -->
+          <div
+            role="menu"
+            aria-label="Aksi catat transaksi"
+            class="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+0.75rem)] z-40 flex flex-col items-stretch w-56 gap-2"
+            [class.pointer-events-none]="!catatMenuOpen()"
           >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Catat transaksi
-        </button>
+            <!-- ii · Impor -->
+            <button
+              type="button"
+              role="menuitem"
+              (click)="onImportTransaction()"
+              class="group relative flex items-center gap-3 rounded-2xl bg-card pl-3 pr-4 py-2.5 ring-1 ring-ink/5 shadow-[0_12px_22px_-12px_rgba(61,36,24,0.32),0_2px_4px_-1px_rgba(61,36,24,0.06)] transition-all duration-300 ease-out active:scale-[0.97]"
+              [class.opacity-0]="!catatMenuOpen()"
+              [class.translate-y-3]="!catatMenuOpen()"
+              [style.transition-delay]="catatItemDelay(0)"
+            >
+              <span
+                aria-hidden="true"
+                class="block self-stretch w-px bg-gradient-to-b from-transparent via-accent-warm/55 to-transparent"
+              ></span>
+              <svg
+                class="w-[18px] h-[18px] text-chip-coral-ink shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2.2" />
+                <circle cx="8.5" cy="8.5" r="1.4" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+              <span class="text-[13px] font-semibold text-ink">Impor</span>
+            </button>
+
+            <!-- i · Catat manual (primary, closest to CTA) -->
+            <button
+              type="button"
+              role="menuitem"
+              (click)="onCreateTransaction()"
+              class="group relative flex items-center gap-3 rounded-2xl bg-card pl-3 pr-4 py-2.5 ring-1 ring-ink/5 shadow-[0_12px_22px_-12px_rgba(61,36,24,0.32),0_2px_4px_-1px_rgba(61,36,24,0.06)] transition-all duration-300 ease-out active:scale-[0.97]"
+              [class.opacity-0]="!catatMenuOpen()"
+              [class.translate-y-3]="!catatMenuOpen()"
+              [style.transition-delay]="catatItemDelay(1)"
+            >
+              <span
+                aria-hidden="true"
+                class="block self-stretch w-px bg-gradient-to-b from-transparent via-accent-warm/55 to-transparent"
+              ></span>
+              <svg
+                class="w-[18px] h-[18px] text-chip-green-ink shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                />
+                <circle cx="16" cy="12" r="1.5" />
+              </svg>
+              <span class="text-[13px] font-semibold text-ink">Catat manual</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            (click)="onCatatClick()"
+            (pointerdown)="onCatatPress()"
+            (pointerup)="onCatatRelease()"
+            (pointerleave)="onCatatRelease()"
+            (pointercancel)="onCatatRelease()"
+            [attr.aria-expanded]="catatMenuOpen()"
+            aria-haspopup="menu"
+            class="relative z-40 w-full rounded-xl flex bg-accent text-on-dark font-semibold px-5 py-3 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition items-center justify-center gap-2"
+          >
+            <svg
+              class="w-4 h-4 transition-transform duration-300 ease-out"
+              [class.rotate-45]="catatMenuOpen()"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Catat transaksi
+          </button>
+        </div>
       </div>
 
       <!-- Pending reservations -->

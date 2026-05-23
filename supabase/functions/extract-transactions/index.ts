@@ -23,7 +23,7 @@ interface Category {
 }
 
 interface DraftOut {
-  date: string;
+  date: string | null;
   amount: number;
   type: 'income' | 'expense' | 'transfer';
   rawDescription: string;
@@ -31,6 +31,8 @@ interface DraftOut {
   suggestedCategoryId?: number;
   transferDirection?: 'in' | 'out';
 }
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 interface RequestBody {
   image?: string;
@@ -61,6 +63,7 @@ function buildPrompt(today: string, categories: Category[]): string {
     '',
     'ATURAN:',
     '- Tanggal: kembalikan dalam format YYYY-MM-DD. Resolusi "Hari ini" → hari ini, "Kemarin" → kemarin, dst.',
+    '    - Jika tanggal TIDAK terlihat / tidak dapat ditentukan dari screenshot, kembalikan null. JANGAN menebak atau memakai hari ini sebagai default.',
     '- Jumlah: angka positif (tanpa Rp atau pemisah ribuan).',
     '- Tipe:',
     '    - "transfer" jika baris adalah transfer antar bank/dompet (teks mengandung "Transfer", "TRF", "Kirim ke", "Terima dari", "Top up dari rekening", nama bank/dompet lain, dst).',
@@ -92,7 +95,7 @@ const RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          date: { type: 'STRING' },
+          date: { type: 'STRING', nullable: true },
           amount: { type: 'NUMBER' },
           type: { type: 'STRING', enum: ['income', 'expense', 'transfer'] },
           rawDescription: { type: 'STRING' },
@@ -104,7 +107,7 @@ const RESPONSE_SCHEMA = {
             nullable: true,
           },
         },
-        required: ['date', 'amount', 'type', 'rawDescription', 'note'],
+        required: ['amount', 'type', 'rawDescription', 'note'],
       },
     },
   },
@@ -207,15 +210,16 @@ Deno.serve(async (req: Request) => {
   const drafts = (parsed.drafts ?? [])
     .filter(
       (d) =>
-        typeof d?.date === 'string' &&
         typeof d?.amount === 'number' &&
         d.amount > 0 &&
         (d.type === 'income' || d.type === 'expense' || d.type === 'transfer'),
     )
     .map<DraftOut>((d) => {
       const isTransfer = d.type === 'transfer';
+      const date =
+        typeof d.date === 'string' && ISO_DATE_RE.test(d.date) ? d.date : null;
       return {
-        date: d.date,
+        date,
         amount: d.amount,
         type: d.type,
         rawDescription: d.rawDescription ?? '',

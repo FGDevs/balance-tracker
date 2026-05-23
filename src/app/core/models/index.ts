@@ -181,7 +181,9 @@ export interface ReservationSummaryEntry {
 //   'in'  → money entered the picked account (picked = to,   user picks `from`)
 // `transferAccountId` is the user's selection of the other side at review time.
 export interface ImportDraft {
-  date: string;
+  // `null` when the extractor could not determine the date from the screenshot —
+  // the user must pick a date in Step 4 before commit (canCommit gates on this).
+  date: string | null;
   amount: number;
   type: 'income' | 'expense' | 'transfer';
   rawDescription: string;
