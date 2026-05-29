@@ -36,6 +36,14 @@ Accounts lead with `Aktual` and surface debt as a chip when present:
 ```
 Negative / over-budget uses `text-chip-coral-ink`; positive growth uses `text-chip-green-ink`. Five canonical chip variants: `green` (success), `coral` (warn/spend), `sky` (info), `amber` (highlight), `cream` (neutral).
 
+### Money input (nominal)
+Amount/nominal fields are plain `<input type="text" inputmode="numeric">` with the `appThousands` directive (`shared/directives/thousands-input.directive.ts`) — it renders `id-ID` thousands grouping live as the user types (e.g. `1.750.000`) and emits a clean `number | null` via the two-way `appThousands` model / `(appThousandsChange)` output. IDR has no fractional unit, so integers only. Pass `allowNegative` for fields that store negatives (e.g. a credit card's current-debt balance). Never use `type="number"` for money — it can't render grouping separators.
+```html
+<input type="text" inputmode="numeric" placeholder="0"
+       [appThousands]="amount()" (appThousandsChange)="amount.set($event)"
+       class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-4 py-3 ..." />
+```
+
 ---
 
 ## Component Recipes (plain HTML + Tailwind)

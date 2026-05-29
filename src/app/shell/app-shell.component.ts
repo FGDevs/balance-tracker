@@ -7,6 +7,7 @@ import { filter, map } from 'rxjs';
 import { AccountService } from '../core/services/account.service';
 import { AuthService } from '../core/services/auth.service';
 import { GroupService } from '../core/services/group.service';
+import { UtilsPeekComponent } from '../shared/components/utils-peek/utils-peek.component';
 
 type Tab = 'dashboard' | 'accounts' | 'transactions' | 'profile';
 
@@ -20,7 +21,7 @@ const TOP_LEVEL: ReadonlySet<string> = new Set([
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [IonRouterOutlet, RouterLink],
+  imports: [IonRouterOutlet, RouterLink, UtilsPeekComponent],
   templateUrl: './app-shell.component.html',
 })
 export class AppShellComponent {

@@ -117,13 +117,19 @@
                 Rp
               </span>
               <input
-                type="number"
-                inputmode="decimal"
+                type="text"
+                inputmode="numeric"
                 placeholder="0"
-                [value]="amount()"
-                (input)="amount.set(asNumber($event))"
+                [appThousands]="amount()"
+                (appThousandsChange)="amount.set($event)"
                 [disabled]="editLocked()"
-                class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-4 py-3 text-ink font-display text-xl placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70" />
+                class="w-full rounded-xl bg-app border border-ink/10 pl-12 pr-12 py-3 text-ink font-display text-xl placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-70" />
+              <span class="absolute right-2 top-1/2 -translate-y-1/2">
+                <app-calc-button
+                  [value]="amount()"
+                  [disabled]="editLocked()"
+                  (result)="amount.set($event)" />
+              </span>
             </div>
             @if (editLocked()) {
             <span class="text-[11px] text-ink-muted mt-1"> Nominal tidak bisa diubah saat edit. </span>
@@ -191,12 +197,17 @@
                     Rp
                   </span>
                   <input
-                    type="number"
-                    inputmode="decimal"
+                    type="text"
+                    inputmode="numeric"
                     placeholder="0"
-                    [value]="item.amount"
-                    (input)="updateItem(i, { amount: asNumber($event) })"
-                    class="w-full rounded-lg bg-card border border-ink/10 pl-8 pr-2 py-2 text-ink text-sm placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                    [appThousands]="item.amount"
+                    (appThousandsChange)="updateItem(i, { amount: $event ?? 0 })"
+                    class="w-full rounded-lg bg-card border border-ink/10 pl-8 pr-9 py-2 text-ink text-sm placeholder:text-ink-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                  <span class="absolute right-1 top-1/2 -translate-y-1/2">
+                    <app-calc-button
+                      [value]="item.amount"
+                      (result)="updateItem(i, { amount: $event })" />
+                  </span>
                 </div>
                 <app-searchable-select
                   [options]="categoryPickerOptions()"

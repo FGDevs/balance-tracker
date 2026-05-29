@@ -81,6 +81,8 @@ export class BankImportService {
           sortIndex: sortIndex,
         });
       } else {
+        const reservedFrom =
+          draft.type === 'expense' ? draft.reservedFromAccountId ?? null : null;
         await this.transactionService.create({
           account_id: params.accountId,
           category_id: draft.suggestedCategoryId,
@@ -89,6 +91,7 @@ export class BankImportService {
           date,
           note,
           sort_index: sortIndex,
+          reserved_from_account_id: reservedFrom,
         } as Omit<Transaction, 'id' | 'user_id' | 'created_by' | 'created_at'>);
       }
     }

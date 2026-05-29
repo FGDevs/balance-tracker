@@ -1,0 +1,71 @@
+<!-- Global utils peek: handle peeping from the right edge, drawer blooms leftward -->
+<div
+  class="fixed right-0 top-1/2 -translate-y-1/2 z-40 pointer-events-none transition-all duration-300 ease-out"
+  [class.opacity-0]="hidden()"
+  [class.translate-x-full]="hidden()"
+>
+  <!-- Backdrop tap-catcher when the drawer is open (closes on outside tap) -->
+  @if (expanded()) {
+    <button
+      type="button"
+      class="fixed inset-0 z-0 bg-hero/20 backdrop-blur-[2px] cursor-default pointer-events-auto"
+      (click)="close()"
+      aria-label="Tutup alat"
+    ></button>
+  }
+
+  <div class="relative z-10 flex items-center gap-2 pr-0 pointer-events-auto">
+    <!-- Drawer of utility tiles, sliding in from the right -->
+    <div
+      role="menu"
+      aria-label="Alat"
+      class="flex flex-col items-stretch gap-2 w-44"
+      [class.pointer-events-none]="!expanded()"
+    >
+      <!-- Kalkulator -->
+      <button
+        type="button"
+        role="menuitem"
+        (click)="goToCalculator()"
+        class="group relative flex items-center gap-3 rounded-2xl bg-card pl-3 pr-4 py-2.5 ring-1 ring-ink/5 shadow-[0_12px_22px_-12px_rgba(61,36,24,0.32),0_2px_4px_-1px_rgba(61,36,24,0.06)] transition-all duration-300 ease-out active:scale-[0.97]"
+        [class.opacity-0]="!expanded()"
+        [class.translate-x-3]="!expanded()"
+      >
+        <span aria-hidden="true" class="block self-stretch w-px bg-gradient-to-b from-transparent via-accent-warm/55 to-transparent"></span>
+        <svg class="w-[18px] h-[18px] text-chip-sky-ink shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="4" y="3" width="16" height="18" rx="2.2" />
+          <path d="M8 7h8" />
+          <path d="M8 12.25h.01 M12 12.25h.01 M16 12.25v3.5" />
+          <path d="M8 16.25h.01 M12 16.25h.01" />
+        </svg>
+        <span class="text-[13px] font-semibold text-ink">Kalkulator</span>
+      </button>
+    </div>
+
+    <!-- Peeping handle: rounded-left tab tucked half past the screen edge until tapped -->
+    <button
+      type="button"
+      (click)="toggle()"
+      [attr.aria-expanded]="expanded()"
+      aria-haspopup="menu"
+      aria-label="Alat"
+      class="relative w-10 h-16 rounded-l-2xl bg-card grid place-items-center ring-1 ring-ink/5 shadow-[0_12px_28px_-10px_rgba(61,36,24,0.32)] transition-transform duration-300 ease-out active:scale-95"
+      [style.transform]="expanded() ? 'translateX(0)' : 'translateX(38%)'"
+    >
+      <!-- chevron points left to "pull out"; flips right (push back) when open -->
+      <svg
+        class="w-5 h-5 text-ink-muted transition-transform duration-300 ease-out"
+        [class.rotate-180]="expanded()"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M15 6l-6 6 6 6" />
+      </svg>
+    </button>
+  </div>
+</div>

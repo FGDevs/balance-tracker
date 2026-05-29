@@ -16,6 +16,8 @@ import {
 import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ViewerScopeService } from '../../core/services/viewer-scope.service';
+import { SavingsVisibilityService } from '../../core/services/savings-visibility.service';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { ViewerScope } from '../../core/models';
 import { AccountCardComponent } from '../../shared/components/account-card/account-card.component';
 import { CurrencyFormatPipe } from '../../shared/pipes/currency-format.pipe';
@@ -38,8 +40,22 @@ export class DashboardPage implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
   private viewerScope = inject(ViewerScopeService);
+  private savingsVisibility = inject(SavingsVisibilityService);
 
-  readonly accounts = this.accountService.accounts;
+  // Raw accounts from the service (used for the "Akun aktif · N" label so the
+  // count reflects what actually exists).
+  readonly allAccounts = this.accountService.accounts;
+  // Saldo total / debt chip / grid all key off this filtered view. When the
+  // user toggles tabungan off, savings accounts disappear from those surfaces.
+  readonly accounts = computed(() =>
+    this.savingsVisibility.include()
+      ? this.allAccounts()
+      : this.allAccounts().filter((a) => a.type !== 'savings'),
+  );
+  readonly includeSavings = this.savingsVisibility.include;
+  readonly hasSavings = computed(() =>
+    this.allAccounts().some((a) => a.type === 'savings'),
+  );
   readonly scope = this.viewerScope.scope;
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -53,6 +69,11 @@ export class DashboardPage implements OnInit {
   setScope(next: ViewerScope): void {
     if (this.scope() === next) return;
     this.viewerScope.set(next);
+  }
+
+  async toggleSavings(): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.savingsVisibility.toggle();
   }
 
   constructor() {

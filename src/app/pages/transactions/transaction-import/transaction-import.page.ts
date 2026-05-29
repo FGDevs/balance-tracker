@@ -17,10 +17,12 @@ import {
   Transaction,
 } from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
+import { ThousandsInputDirective } from '../../../shared/directives/thousands-input.directive';
 import {
   SearchableSelectComponent,
   SearchableSelectOption,
 } from '../../../shared/components/searchable-select/searchable-select.component';
+import { CalcButtonComponent } from '../../../shared/components/calc-button/calc-button.component';
 
 type Step = 'account' | 'upload' | 'extracting' | 'review';
 
@@ -37,7 +39,13 @@ function shiftDate(date: string, deltaDays: number): string {
 @Component({
   selector: 'app-transaction-import',
   standalone: true,
-  imports: [IonContent, CurrencyFormatPipe, SearchableSelectComponent],
+  imports: [
+    IonContent,
+    CurrencyFormatPipe,
+    ThousandsInputDirective,
+    SearchableSelectComponent,
+    CalcButtonComponent,
+  ],
   templateUrl: './transaction-import.page.html',
 })
 export class TransactionImportPage {
@@ -81,6 +89,30 @@ export class TransactionImportPage {
     const id = this.accountId();
     return this.accounts().filter((a) => a.id !== id);
   });
+
+  // Owing-account candidates: non-credit accounts other than the payer. Empty
+  // when the user only has one non-credit account (or only credit cards).
+  readonly owingAccountOptions = computed(() => {
+    const id = this.accountId();
+    return this.accounts().filter((a) => a.type !== 'credit' && a.id !== id);
+  });
+
+  readonly owingAccountPickerOptions = computed<SearchableSelectOption[]>(() =>
+    this.owingAccountOptions().map((a) => ({
+      id: a.id,
+      label: a.name,
+      sublabel: ACCOUNT_TYPE_LABEL[a.type],
+    })),
+  );
+
+  // Bulk default for the Review step. Picking propagates to every expense row
+  // (overwrites prior per-row values); clearing wipes them. Per-row pickers
+  // still allow individual overrides after.
+  readonly defaultOwingAccountId = signal<number | null>(null);
+
+  readonly hasExpenseDraft = computed(() =>
+    this.drafts().some((d) => d.type === 'expense' && !d.skip),
+  );
 
   readonly incomeCategoryPickerOptions = computed<SearchableSelectOption[]>(
     () => this.incomeCategories().map((c) => ({ id: c.id, label: c.name })),
@@ -297,10 +329,9 @@ export class TransactionImportPage {
     if (next) void this.ensureNearbyForDates(this.windowDatesFor(next));
   }
 
-  onAmountChange(index: number, value: string): void {
-    const num = Number(value);
-    if (Number.isFinite(num) && num > 0) {
-      this.updateDraft(index, { amount: num });
+  onAmountChange(index: number, value: number | null): void {
+    if (value != null && Number.isFinite(value) && value > 0) {
+      this.updateDraft(index, { amount: value });
     }
   }
 
@@ -331,7 +362,29 @@ export class TransactionImportPage {
       suggestedCategoryId: stillValid,
       transferDirection: undefined,
       transferAccountId: undefined,
+      // income rows can't carry a reservation; expense rows inherit the bulk
+      // default when switching in (or stay on whatever value the row already
+      // had if the user had pre-set it before flipping types).
+      reservedFromAccountId:
+        value === 'expense'
+          ? current.reservedFromAccountId ?? this.defaultOwingAccountId() ?? undefined
+          : null,
     });
+  }
+
+  // Page-level "fill all expense rows" picker. Mass-set on change so the
+  // common case (CC statement → one owing account) is a single tap.
+  onDefaultOwingPick(id: number | null): void {
+    this.defaultOwingAccountId.set(id);
+    this.drafts.update((list) =>
+      list.map((d) =>
+        d.type === 'expense' ? { ...d, reservedFromAccountId: id } : d,
+      ),
+    );
+  }
+
+  onRowOwingPick(index: number, id: number | null): void {
+    this.updateDraft(index, { reservedFromAccountId: id });
   }
 
   onNoteChange(index: number, value: string): void {

@@ -750,8 +750,8 @@
                   cdkDragLockAxis="y"
                   role="button"
                   tabindex="0"
-                  (click)="onTransactionClick(tx.id)"
-                  (keydown.enter)="onTransactionClick(tx.id)"
+                  (click)="onMutasiRowClick(tx)"
+                  (keydown.enter)="onMutasiRowClick(tx)"
                   class="w-full flex items-start justify-between gap-3 px-5 py-3.5 text-left border-b border-ink/5 bg-card transition"
                   [class.cursor-pointer]="!reorderMode()"
                   [class.active:bg-app\/40]="!reorderMode()"
@@ -765,6 +765,13 @@
                           {{ tx.category?.name ?? 'Tanpa kategori' }}
                         }
                       </p>
+                      @if (isSettlementTransfer(tx)) {
+                        <span
+                          class="shrink-0 inline-flex items-center rounded-full bg-chip-sky-bg text-chip-sky-ink text-[10px] font-semibold px-2 py-0.5 tracking-wide"
+                        >
+                          pelunasan
+                        </span>
+                      }
                       @if (tx.reserved_from_account_id) {
                         <span
                           class="shrink-0 inline-flex items-center rounded-full bg-chip-amber-bg text-chip-amber-ink text-[10px] font-semibold px-2 py-0.5 tracking-wide"
@@ -936,6 +943,61 @@
             class="rounded-xl bg-chip-coral-ink text-on-dark font-semibold px-5 py-3 shadow-[0_2px_10px_-2px_rgba(181,74,60,0.4)] active:scale-[0.98] transition disabled:opacity-60"
           >
             Hapus
+          </button>
+        </div>
+      </div>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Reverse settlement confirm sheet -->
+  <ion-modal
+    [isOpen]="showReverseConfirm()"
+    [breakpoints]="[0, 1]"
+    [initialBreakpoint]="1"
+    [handle]="false"
+    (didDismiss)="closeReverseConfirm()"
+  >
+    <ng-template>
+      <div
+        class="bg-card px-6 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] rounded-t-3xl"
+      >
+        <div class="mx-auto w-12 h-1 rounded-full bg-ink/10 mb-5"></div>
+        <p
+          class="text-[11px] tracking-[0.22em] uppercase text-chip-coral-ink font-semibold"
+        >
+          Konfirmasi
+        </p>
+        <h2 class="font-display text-2xl text-ink mt-2 leading-tight">
+          Batalkan pelunasan
+          @if (reverseTarget(); as t) {
+            @if (account(); as a) {
+              <span class="italic text-accent"
+                >{{ t.amount | currencyFormat: a.currency_code }}</span
+              >?
+            }
+          }
+        </h2>
+        <p class="text-sm text-ink-soft mt-3 leading-relaxed">
+          Hutang yang dilunasi akan kembali tercatat sebagai belum lunas, dan
+          transfer pelunasan ini akan dihapus. Saldo kedua akun dikembalikan
+          seperti sebelum pelunasan.
+        </p>
+        <div class="mt-6 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            (click)="closeReverseConfirm()"
+            [disabled]="reversing()"
+            class="rounded-xl bg-transparent text-ink border border-ink/15 font-medium px-5 py-3 active:scale-[0.98] transition disabled:opacity-60"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            (click)="onConfirmReverse()"
+            [disabled]="reversing()"
+            class="rounded-xl bg-chip-coral-ink text-on-dark font-semibold px-5 py-3 shadow-[0_2px_10px_-2px_rgba(181,74,60,0.4)] active:scale-[0.98] transition disabled:opacity-60"
+          >
+            {{ reversing() ? 'Membatalkan…' : 'Batalkan pelunasan' }}
           </button>
         </div>
       </div>

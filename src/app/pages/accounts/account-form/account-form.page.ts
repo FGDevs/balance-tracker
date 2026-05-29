@@ -5,6 +5,8 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { IonContent, IonModal } from '@ionic/angular/standalone';
 import { Account, AccountType } from '../../../core/models';
 import { AccountService } from '../../../core/services/account.service';
+import { ThousandsInputDirective } from '../../../shared/directives/thousands-input.directive';
+import { CalcButtonComponent } from '../../../shared/components/calc-button/calc-button.component';
 
 const COLOR_PRESETS = [
   '#d97a3c',
@@ -30,7 +32,7 @@ interface TypeOption {
 @Component({
   selector: 'app-account-form',
   standalone: true,
-  imports: [IonContent, IonModal],
+  imports: [IonContent, IonModal, ThousandsInputDirective, CalcButtonComponent],
   templateUrl: './account-form.page.html',
 })
 export class AccountFormPage implements OnInit {

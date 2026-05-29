@@ -1,15 +1,17 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { Router } from '@angular/router';
-import { IonContent, IonRefresher, IonRefresherContent } from '@ionic/angular/standalone';
+import { IonContent, IonModal, IonRefresher, IonRefresherContent } from '@ionic/angular/standalone';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { AccountService } from '../../core/services/account.service';
 import { GroupService } from '../../core/services/group.service';
 import { TransactionService } from '../../core/services/transaction.service';
 import { ViewerScopeService } from '../../core/services/viewer-scope.service';
+import { SavingsVisibilityService } from '../../core/services/savings-visibility.service';
 import {
   ACCOUNT_TYPE_LABEL,
   CategoryBreakdownEntry,
+  CategoryDrillEntry,
   ReservationSummaryEntry,
   ViewerScope,
 } from '../../core/models';
@@ -86,6 +88,7 @@ function formatLongDate(iso: string): string {
   standalone: true,
   imports: [
     IonContent,
+    IonModal,
     IonRefresher,
     IonRefresherContent,
     CurrencyFormatPipe,
@@ -97,9 +100,12 @@ export class StatisticsPage {
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
   private readonly viewerScope = inject(ViewerScopeService);
+  private readonly savingsVisibility = inject(SavingsVisibilityService);
   private readonly groupService = inject(GroupService);
   private readonly location = inject(Location);
   private readonly router = inject(Router);
+
+  readonly includeSavings = this.savingsVisibility.include;
 
   readonly presets = PRESETS;
 
@@ -170,6 +176,23 @@ export class StatisticsPage {
       }
       void this.fetch();
     });
+
+    // Re-fetch when the tabungan toggle flips — only matters for "Semua akun",
+    // but a cheap refetch keeps the logic in one place.
+    let firstSavingsRun = true;
+    effect(() => {
+      const _ = this.includeSavings();
+      if (firstSavingsRun) {
+        firstSavingsRun = false;
+        return;
+      }
+      void this.fetch();
+    });
+  }
+
+  async toggleSavings(): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.savingsVisibility.toggle();
   }
 
   private async bootstrap(): Promise<void> {
@@ -245,6 +268,50 @@ export class StatisticsPage {
     void this.router.navigate(['/accounts', accountId]);
   }
 
+  // ── Category drill ─────────────────────────────────────────────────────
+  // Tapping a Rincian kategori row opens a sheet listing the contributing
+  // transactions/items under the page's current filters.
+  readonly drillOpen = signal<boolean>(false);
+  readonly drillEntry = signal<CategoryBreakdownEntry | null>(null);
+  readonly drillRows = signal<CategoryDrillEntry[]>([]);
+  readonly drillLoading = signal<boolean>(false);
+  readonly drillError = signal<string | null>(null);
+
+  async openCategoryDrill(entry: CategoryBreakdownEntry): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.drillEntry.set(entry);
+    this.drillRows.set([]);
+    this.drillError.set(null);
+    this.drillOpen.set(true);
+    this.drillLoading.set(true);
+    try {
+      const rows = await this.transactionService.getTransactionsForCategory({
+        from: this.dateFrom(),
+        to: this.dateTo(),
+        accountId: this.accountId(),
+        includeSavings: this.includeSavings(),
+        categoryId: entry.category?.id ?? null,
+      });
+      this.drillRows.set(rows);
+    } catch (err) {
+      this.drillError.set(
+        err instanceof Error ? err.message : 'Gagal memuat transaksi',
+      );
+    } finally {
+      this.drillLoading.set(false);
+    }
+  }
+
+  closeCategoryDrill(): void {
+    this.drillOpen.set(false);
+  }
+
+  async openTransaction(txId: number): Promise<void> {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    this.drillOpen.set(false);
+    void this.router.navigate(['/transactions', txId, 'edit']);
+  }
+
   formatDate(iso: string): string {
     return formatLongDate(iso);
   }
@@ -264,9 +331,11 @@ export class StatisticsPage {
           from: this.dateFrom(),
           to: this.dateTo(),
           accountId: this.accountId(),
+          includeSavings: this.includeSavings(),
         }),
         this.transactionService.getReservationSummary({
           accountId: this.accountId(),
+          includeSavings: this.includeSavings(),
         }),
       ]);
       this.breakdown.set(bd);

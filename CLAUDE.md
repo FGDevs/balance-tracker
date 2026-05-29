@@ -99,7 +99,8 @@ src/
 │   │   │   ├── settlement.service.ts       # bulk + partial settlement
 │   │   │   ├── bank-import.service.ts      # screenshot → extract-transactions edge fn
 │   │   │   ├── group.service.ts            # invitations, memberships, kick/leave
-│   │   │   └── viewer-scope.service.ts     # mine/others/all filter signal
+│   │   │   ├── viewer-scope.service.ts     # mine/others/all filter signal
+│   │   │   └── savings-visibility.service.ts # persisted tabungan-in-totals toggle
 │   │   └── guards/auth.guard.ts            # CanActivateFn
 │   ├── shell/app-shell.component.{ts,html} # bottom tab bar + ion-router-outlet for authed routes
 │   ├── pages/
@@ -112,7 +113,8 @@ src/
 │   │   ├── calculator/                     # tally selected transactions (filters + sticky total)
 │   │   ├── statistics/                     # subpage from Dashboard, account + period filters
 │   │   └── profile/                        # name, email, sign out, group management
-│   ├── shared/components/{amount-display,account-card,transaction-item,currency-input,searchable-select}/
+│   ├── shared/components/{amount-display,account-card,transaction-item,currency-input,searchable-select,utils-peek}/
+│   ├── shared/directives/thousands-input.directive.ts  # appThousands — id-ID grouping on money inputs
 │   ├── shared/pipes/currency-format.pipe.ts
 │   └── app.routes.ts
 ├── environments/{environment.ts, environment.prod.ts}  # generated, gitignored
@@ -257,6 +259,48 @@ NOTE on parent.amount when splitting items: the parent.amount is unchanged after
 SUM(items.amount) still equals parent.amount because (settled_portion + remainder_amount) == entry.amount.
 ```
 
+### 7.4.1 Settlement modes (UI-level)
+
+The Settlement Form exposes two ways to drive a payment. Both share the "transfer + balance-adjust" half of §7.4 (steps 1–3 plus the real-money balance moves). They differ only in which reservation entries get marked settled.
+
+**Amount-driven (default)** — user enters `payment_amount`; the FIFO loop in §7.4 runs as written. May split the straddling entry. `payment_amount` may be < or = `SUM(unsettled)` for the picked owing↔lender pair.
+
+**Selection-driven** — user ticks specific unsettled entries (parent- or item-kind). `payment_amount = SUM(selected.amount)` exactly. The loop runs only over the chosen entries; every one is fully settled. **No partial split is possible in this mode** — chronology is not enforced, the user explicitly chose which debts to clear.
+
+Service layer: `settle()` keeps its amount-driven signature unchanged. Add sibling `settleSelected({ payerAccountId, reservedFromAccountId, entries, paymentDate })`. The service NEVER decides the mode — the UI does, and calls the corresponding method. Both also accept an optional `viaAccountId?: number | null` (§7.4.2).
+
+### 7.4.2 Settlement via a conduit account
+
+Real-world payoffs often route money through a different real account than the owing one — e.g. you transfer earmarked money `belanja → mandiri`, then `mandiri` pays the credit card. The owing account isn't the account whose cash physically reaches the creditor. (Same payer-vs-owner split as §7.3, applied to the payoff.)
+
+Both `settle()` and `settleSelected()` accept an optional **`viaAccountId`** = the real account that physically pays the creditor:
+- **omitted / null / equal to owing / equal to creditor** → single transfer `owing → creditor` (steps 1–3 of §7.4, unchanged).
+- **a distinct third account** → record **two** transfer pairs instead: `owing → via` then `via → creditor`.
+
+Net balance effect is identical to the single-transfer form: `owing −= amount`, `via` unchanged (money in then out), `creditor += amount`. The point is fidelity, not different totals — the conduit account's mutasi now carries the two real legs so it reconciles against the bank statement (which this app mirrors). `debt_settlements.transfer_tx_id` = the owing-side debit row (leg 1's out when `via` is used; the single transfer otherwise). All transfer rows note `'Debt settlement'`. The conduit's two `adjustBalance` moves cancel, so balance math still only touches owing and creditor.
+
+`viaAccountId` affects ONLY which money legs are written — the reservation-marking algorithm (FIFO / selection / partial split) is untouched. The owing account still bears the balance-shortage warning (its debit happens first).
+
+*Future (not in v1 of this feature): allow attaching an already-recorded transfer/expense as a settlement's money movement instead of generating the legs.*
+
+### 7.4.3 Reversing a settlement
+
+`SettlementService.reverseSettlement(settlementId)` fully undoes one `settle()` / `settleSelected()` call, returning every paid reservation to unsettled and removing the money legs. It is the inverse of §7.4, in this order:
+
+1. **Re-merge the partial split.** If the settlement split a straddling entry (parent- or item-kind), add the unsettled remainder row's amount back into the original (the original carries `settlement_id = settlementId`; the remainder points back via `parent_tx_id` / `parent_item_id` and has `settlement_id IS NULL`) and delete the remainder. At most one split exists per settlement. No balance adjustment — splitting never moved money.
+2. **Un-stamp** `settlement_id = NULL` on every `transactions` and `transaction_items` row where `settlement_id = settlementId`. The debts are unsettled again. (Runs after step 1, which identifies originals by that same id.)
+3. **Reverse the money movement** — mirror of §7.4 step 2's net effect: owing `+= total_amount`, creditor `−= total_amount`. A conduit's two legs cancel, so only owing + creditor move regardless of `viaAccountId`.
+4. **Delete the money legs**, then the `debt_settlements` row. Detach `debt_settlements.transfer_tx_id` first (FK), then delete every `transactions` row with `settlement_transfer_id = settlementId` (2 legs direct, 4 conduit), then the settlement row.
+
+To make step 4 reliable for conduit settlements (whose second leg `via → creditor` isn't reachable from `debt_settlements.transfer_tx_id`), every transfer row a settlement creates is stamped at settle time with **`transactions.settlement_transfer_id`** (FK → `debt_settlements`, distinct from `settlement_id`). See §5 / migration `db/migrations/0010_settlement_transfer_link.sql`.
+
+Constraints / v1 limits:
+- **Reverse newest-first.** If a later settlement consumed this one's split remainder, the older reversal leaves that remainder in place (it only touches its own `settlement_id` / `settlement_transfer_id` rows).
+- Like `settle()`, this is **client-orchestrated** (sequential writes, not a single DB transaction) — a mid-failure can leave partial state, same risk the existing settle flow carries.
+- Pre-0010 **conduit** settlements aren't auto-reversible (their legs were never stamped and can't be backfilled reliably); the migration backfills direct settlements only.
+
+UI: in **Account Detail → Mutasi**, a settlement-generated transfer leg (`type='transfer'` with `settlement_transfer_id` set) shows a `pelunasan` chip and, instead of opening the Transaction Form (which doesn't understand settlements), tapping it opens a confirm sheet that calls `reverseSettlement`. See `docs/ui-screens.md`.
+
 ### 7.5 Credit Utilization
 ```
 utilization_pct  = ABS(balance) / credit_limit * 100
@@ -342,6 +386,7 @@ Route `/statistics`, lazy-loaded inside `AppShellComponent`. Sub-page — tab ba
 
 ### Filters
 - **Akun** — single-select via `<app-searchable-select>`. Default `Semua akun`; other options are every non-deleted account the viewer can see (own + foreign-visible, foreign annotated with `· {ownerName}`). Filter applies to `transactions.account_id` (physical-payer perspective, same as Calculator).
+- **Tabungan toggle** — when `accountId === null` only, a small chip below the Akun picker mirrors Dashboard's `SavingsVisibilityService` chip. Flipping it persists to `localStorage['bt:include-savings']` and re-fetches both sections; the breakdown drops savings-payer transactions, the reservation summary drops savings-owing rows. Hidden when a specific account is picked.
 - **Periode** — preset pill row: `Bulan ini` (default), `Bulan lalu`, `Custom`. `Custom` reveals two `<input type="date">` (from/to, inclusive both ends). The "Reservasi" section ignores this filter — see below.
 - **Penulis** (viewer scope) — same `Saya` / `Lain` / `Semua` pill row as Dashboard, bound to `ViewerScopeService.scope`. Applies to the category breakdown via `created_by` filter. The reservation summary also honors it (entries created by others are filtered out when scope = `Saya`).
 
@@ -352,6 +397,7 @@ Route `/statistics`, lazy-loaded inside `AppShellComponent`. Sub-page — tab ba
 - **Settled vs unsettled**: both included. A settled debt was still a real expense at the time it happened.
 - **Transfers**: excluded entirely (no category).
 - Empty state: cream chip card "Belum ada pengeluaran di periode ini."
+- **Drill-down** — each row is a button. Tap opens an `ion-modal` sheet listing the contributing transactions/items under the page's current filters (period, account, scope, tabungan toggle). Rows render the item note (if applicable) or transaction note, the parent's date + account, and the `contribution` amount (item.amount or parent.amount). Item-sourced rows show a small cream `rincian` chip so the user knows the contribution came from one part of a split. Tapping a row navigates to `/transactions/{id}/edit`. Backed by `TransactionService.getTransactionsForCategory` (signature below) and the new `CategoryDrillEntry` model.
 
 ### Section 2 — Reservasi & hutang (current state, ignores period filter)
 - Headline number: total currently reserved across the viewer-visible scope (matches the dashboard `Hutang aktif` number when account = `Semua`).
@@ -362,9 +408,10 @@ Route `/statistics`, lazy-loaded inside `AppShellComponent`. Sub-page — tab ba
 
 ### Implementation notes
 - New service methods on `TransactionService`:
-  - `getCategoryBreakdown({ from, to, accountId }): Promise<CategoryBreakdownEntry[]>` — non-transfer rows in `[from, to]`, expands items where present, groups by `category_id`, honors viewer scope via `created_by`.
-  - `getReservationSummary({ accountId }): Promise<ReservationSummaryEntry[]>` — UNION of parent-level + item-level unsettled reservations, grouped by `reserved_from_account_id`, returns `{ account, totalReserved, count, oldestDate }[]`. Honors viewer scope.
-- New types in `src/app/core/models/index.ts`: `CategoryBreakdownEntry`, `ReservationSummaryEntry`.
+  - `getCategoryBreakdown({ from, to, accountId, includeSavings? }): Promise<CategoryBreakdownEntry[]>` — non-transfer rows in `[from, to]`, expands items where present, groups by `category_id`, honors viewer scope via `created_by`. `includeSavings=false` drops transactions whose payer is a savings account; only applied when `accountId == null`.
+  - `getTransactionsForCategory({ from, to, accountId, includeSavings?, categoryId })` → `CategoryDrillEntry[]` — drill-down for one breakdown bucket. Same filter set as `getCategoryBreakdown`. Returns per-contribution entries (`{ transaction, contribution, source: 'parent' | 'item', itemId?, itemNote? }`) sorted by parent date desc then id desc. `categoryId = null` resolves the "Tanpa kategori" bucket (parents with no items + null `category_id`, and items inside split transactions whose own `category_id` is null).
+  - `getReservationSummary({ accountId, includeSavings? }): Promise<ReservationSummaryEntry[]>` — UNION of parent-level + item-level unsettled reservations, grouped by `reserved_from_account_id`, returns `{ account, totalReserved, count, oldestDate }[]`. Honors viewer scope. `includeSavings=false` drops rows where the owing account is savings; only applied when `accountId == null`.
+- New types in `src/app/core/models/index.ts`: `CategoryBreakdownEntry`, `CategoryDrillEntry`, `ReservationSummaryEntry`.
 - Page uses only `ion-content` + `ion-refresher` from Ionic; everything else plain HTML + Tailwind.
 - Money formatted via `currencyFormat` pipe + `AuthService.currency()`.
 

@@ -3,7 +3,9 @@ import {
   Account,
   Category,
   CategoryBreakdownEntry,
+  CategoryDrillEntry,
   ReservationEntry,
+  ReservationPairEntry,
   ReservationSummaryEntry,
   Transaction,
   TransactionItem,
@@ -262,6 +264,11 @@ export class TransactionService {
     from: string;
     to: string;
     accountId?: number | null;
+    // When false AND accountId is null, drops transactions whose payer is a
+    // savings account so the "Semua akun" breakdown honors the Dashboard
+    // tabungan toggle. No effect when a specific account is selected — the user
+    // already scoped it themselves.
+    includeSavings?: boolean;
   }): Promise<CategoryBreakdownEntry[]> {
     let q = this.supabase
       .getClient()
@@ -274,7 +281,10 @@ export class TransactionService {
     q = this.applyScope(q);
     const { data, error } = await q;
     if (error) throw error;
-    const txs = this.normalize((data ?? []) as Transaction[]);
+    let txs = this.normalize((data ?? []) as Transaction[]);
+    if (opts.accountId == null && opts.includeSavings === false) {
+      txs = txs.filter((t) => t.account?.type !== 'savings');
+    }
 
     type Bucket = { category: Category | null; total: number; count: number };
     const buckets = new Map<number | 'none', Bucket>();
@@ -321,12 +331,77 @@ export class TransactionService {
       .sort((a, b) => b.total - a.total);
   }
 
+  // §14 Statistics — drill-down list for one breakdown bucket. Mirrors
+  // getCategoryBreakdown's filters and item-expansion rules, but returns the
+  // contributing entries instead of aggregating. `categoryId = null` → the
+  // synthetic "Tanpa kategori" bucket (parents with no items + null category,
+  // and items inside split transactions whose own category_id is null).
+  // Sorted by parent date desc, then parent id desc.
+  async getTransactionsForCategory(opts: {
+    from: string;
+    to: string;
+    accountId?: number | null;
+    includeSavings?: boolean;
+    categoryId: number | null;
+  }): Promise<CategoryDrillEntry[]> {
+    let q = this.supabase
+      .getClient()
+      .from('transactions')
+      .select(TX_SELECT)
+      .eq('type', 'expense')
+      .gte('date', opts.from)
+      .lte('date', opts.to);
+    if (opts.accountId != null) q = q.eq('account_id', opts.accountId);
+    q = this.applyScope(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    let txs = this.normalize((data ?? []) as Transaction[]);
+    if (opts.accountId == null && opts.includeSavings === false) {
+      txs = txs.filter((t) => t.account?.type !== 'savings');
+    }
+
+    const matches = (id: number | null | undefined): boolean =>
+      opts.categoryId == null ? id == null : id === opts.categoryId;
+
+    const out: CategoryDrillEntry[] = [];
+    for (const tx of txs) {
+      if (tx.items && tx.items.length > 0) {
+        for (const item of tx.items) {
+          if (!matches(item.category_id)) continue;
+          out.push({
+            transaction: tx,
+            contribution: Number(item.amount),
+            source: 'item',
+            itemId: item.id,
+            itemNote: item.note ?? null,
+          });
+        }
+      } else if (matches(tx.category_id)) {
+        out.push({
+          transaction: tx,
+          contribution: Number(tx.amount),
+          source: 'parent',
+        });
+      }
+    }
+    out.sort((a, b) => {
+      if (a.transaction.date !== b.transaction.date) {
+        return a.transaction.date < b.transaction.date ? 1 : -1;
+      }
+      return b.transaction.id - a.transaction.id;
+    });
+    return out;
+  }
+
   // §14 Statistics — current-state reservation summary, ignores any period.
   // Groups unsettled parent-level + item-level reservations by owing account.
   // When accountId is set, returns at most one entry (for that account).
   // Honors viewer scope via created_by.
   async getReservationSummary(opts: {
     accountId?: number | null;
+    // When false AND accountId is null, drops rows where the owing account is a
+    // savings account. Same intent as getCategoryBreakdown's flag.
+    includeSavings?: boolean;
   }): Promise<ReservationSummaryEntry[]> {
     const client = this.supabase.getClient();
 
@@ -381,12 +456,15 @@ export class TransactionService {
       }
     };
 
+    const dropSavings =
+      opts.accountId == null && opts.includeSavings === false;
     for (const row of (parentRows ?? []) as unknown as Array<{
       amount: number;
       date: string;
       reserved_from_account: Account | null;
     }>) {
       if (!row.reserved_from_account) continue;
+      if (dropSavings && row.reserved_from_account.type === 'savings') continue;
       add(row.reserved_from_account, Number(row.amount), row.date);
     }
     for (const row of (itemRows ?? []) as unknown as Array<{
@@ -395,6 +473,7 @@ export class TransactionService {
       parent: { date: string } | null;
     }>) {
       if (!row.reserved_from_account || !row.parent) continue;
+      if (dropSavings && row.reserved_from_account.type === 'savings') continue;
       add(row.reserved_from_account, Number(row.amount), row.parent.date);
     }
 
@@ -404,6 +483,80 @@ export class TransactionService {
         totalReserved: Number(a.totalReserved.toFixed(2)),
         count: a.count,
         oldestDate: a.oldestDate,
+      }))
+      .sort((a, b) => b.totalReserved - a.totalReserved);
+  }
+
+  // Calculator Hutang picker — unsettled debt grouped by (owing → creditor)
+  // pair. owing = reserved_from_account_id; creditor = the payer that fronted
+  // the money (parent-level: transactions.account_id; item-level: the parent
+  // transaction's account_id). Sums parent- + item-level rows. Honors scope.
+  async getReservationPairs(): Promise<ReservationPairEntry[]> {
+    const client = this.supabase.getClient();
+
+    let parentQ = client
+      .from('transactions')
+      .select(
+        'amount, owing:accounts!reserved_from_account_id(*), creditor:accounts!account_id(*)',
+      )
+      .not('reserved_from_account_id', 'is', null)
+      .is('settlement_id', null);
+    parentQ = this.applyScope(parentQ);
+    const { data: parentRows, error: parentErr } = await parentQ;
+    if (parentErr) throw parentErr;
+
+    let itemQ = client
+      .from('transaction_items')
+      .select(
+        'amount, owing:accounts!reserved_from_account_id(*), parent:transactions!transaction_id(creditor:accounts!account_id(*))',
+      )
+      .not('reserved_from_account_id', 'is', null)
+      .is('settlement_id', null);
+    itemQ = this.applyScope(itemQ);
+    const { data: itemRows, error: itemErr } = await itemQ;
+    if (itemErr) throw itemErr;
+
+    type Pair = {
+      owing: Account;
+      creditor: Account;
+      totalReserved: number;
+      count: number;
+    };
+    const byPair = new Map<string, Pair>();
+    const add = (owing: Account, creditor: Account, amount: number) => {
+      const key = `${owing.id}-${creditor.id}`;
+      const existing = byPair.get(key);
+      if (existing) {
+        existing.totalReserved += amount;
+        existing.count += 1;
+      } else {
+        byPair.set(key, { owing, creditor, totalReserved: amount, count: 1 });
+      }
+    };
+
+    for (const row of (parentRows ?? []) as unknown as Array<{
+      amount: number;
+      owing: Account | null;
+      creditor: Account | null;
+    }>) {
+      if (!row.owing || !row.creditor) continue;
+      add(row.owing, row.creditor, Number(row.amount));
+    }
+    for (const row of (itemRows ?? []) as unknown as Array<{
+      amount: number;
+      owing: Account | null;
+      parent: { creditor: Account | null } | null;
+    }>) {
+      if (!row.owing || !row.parent?.creditor) continue;
+      add(row.owing, row.parent.creditor, Number(row.amount));
+    }
+
+    return Array.from(byPair.values())
+      .map<ReservationPairEntry>((p) => ({
+        owing: p.owing,
+        creditor: p.creditor,
+        totalReserved: Number(p.totalReserved.toFixed(2)),
+        count: p.count,
       }))
       .sort((a, b) => b.totalReserved - a.totalReserved);
   }
@@ -458,10 +611,13 @@ export class TransactionService {
 
     if (tx.type === 'income') {
       await this.adjustBalance(tx.account_id, tx.amount);
-    } else if (tx.type === 'expense' && !tx.reserved_from_account_id) {
-      // Real-bank-statement consistency: parent.amount always debits the payer
-      // when there is no parent-level reservation. Item-level reservation does
-      // not change this — the bank mutation row is one event.
+    } else if (tx.type === 'expense') {
+      // §7.3: every expense debits the payer — including BOTH reservation
+      // flavors (credit-card balance grows more negative; non-credit payer's
+      // real cash leaves). The reservation only marks WHICH account owes the
+      // payer back; it does not erase the cash event itself. Item-level
+      // reservation also doesn't change this — the bank mutation row is one
+      // event sized at parent.amount.
       await this.adjustBalance(tx.account_id, -tx.amount);
     }
     return tx;
@@ -735,17 +891,40 @@ export class TransactionService {
     if (!existing) return;
     const client = this.supabase.getClient();
 
+    // Settlement legs must be reversed via SettlementService.reverseSettlement
+    // (§7.4.3), not deleted here — dropping one leg orphans the settlement, and
+    // the anchor leg is held by debt_settlements.transfer_tx_id anyway.
+    if (existing.settlement_transfer_id != null) {
+      throw new Error(
+        'Transaksi ini bagian dari pelunasan hutang. Batalkan pelunasannya dari halaman akun (Mutasi).',
+      );
+    }
+
     if (existing.type === 'transfer' && existing.transfer_pair_id) {
       const pair = await this.getById(existing.transfer_pair_id);
-      const { error: pairErr } = await client
+      // Both rows reference each other via transfer_pair_id, so deleting either
+      // alone trips transactions_transfer_pair_id_fkey. Remove both in ONE
+      // statement — at statement end neither dangles.
+      const { error: delErr } = await client
         .from('transactions')
         .delete()
-        .eq('id', existing.transfer_pair_id);
-      if (pairErr) throw pairErr;
-      if (pair) {
-        const sign = pair.type === 'transfer' ? -1 : 0;
-        await this.adjustBalance(pair.account_id, sign * pair.amount);
+        .in('id', [id, existing.transfer_pair_id]);
+      if (delErr) throw delErr;
+
+      // Reverse each leg's creation-time balance move. The credit (incoming)
+      // leg is the one created second — its pair has a LOWER id; it raised its
+      // account, so deleting it lowers it again. The debit (outgoing) leg did
+      // the opposite.
+      for (const row of [existing, pair]) {
+        if (!row || row.type !== 'transfer') continue;
+        const isIncoming =
+          row.transfer_pair_id != null && row.transfer_pair_id < row.id;
+        await this.adjustBalance(
+          row.account_id,
+          isIncoming ? -row.amount : row.amount,
+        );
       }
+      return;
     }
 
     const { error } = await client
@@ -756,11 +935,11 @@ export class TransactionService {
 
     if (existing.type === 'income') {
       await this.adjustBalance(existing.account_id, -existing.amount);
-    } else if (existing.type === 'expense' && !existing.reserved_from_account_id) {
-      await this.adjustBalance(existing.account_id, existing.amount);
-    } else if (existing.type === 'expense' && existing.reserved_from_account_id) {
+    } else if (existing.type === 'expense') {
+      // Plain and reserved expenses both debited the payer at creation; add back.
       await this.adjustBalance(existing.account_id, existing.amount);
     } else if (existing.type === 'transfer') {
+      // Pairless transfer (shouldn't normally happen): treat as an outgoing leg.
       await this.adjustBalance(existing.account_id, existing.amount);
     }
   }

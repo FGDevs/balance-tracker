@@ -215,6 +215,28 @@
               Lewati semua
             </button>
           </div>
+
+          @if (hasExpenseDraft() && owingAccountOptions().length > 0) {
+            <div class="mt-4 pt-4 border-t border-ink/5 flex flex-col gap-1.5">
+              <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold">
+                Hutang ke akun · semua keluar
+              </span>
+              <app-searchable-select
+                [options]="owingAccountPickerOptions()"
+                [value]="defaultOwingAccountId()"
+                (valueChange)="onDefaultOwingPick($event)"
+                placeholder="Tanpa hutang"
+                searchPlaceholder="Cari akun..."
+                modalTitle="Akun penanggung"
+                modalEyebrow="Pilih untuk semua keluar"
+                emptyMessage="Akun tidak ditemukan."
+                [allowClear]="true"
+                [compact]="true" />
+              <p class="text-[11px] text-ink-muted leading-snug">
+                Terapkan ke setiap baris keluar di bawah. Bisa diubah per baris.
+              </p>
+            </div>
+          }
         </div>
 
         @for (draft of drafts(); track $index; let i = $index) {
@@ -282,16 +304,22 @@
                 <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold">
                   Nominal
                 </span>
-                <input
-                  type="number"
-                  inputmode="numeric"
-                  step="0.01"
-                  min="0.01"
-                  [value]="draft.amount"
-                  (input)="onAmountChange(i, $any($event.target).value)"
-                  [disabled]="draft.skip"
-                  class="w-full rounded-xl bg-app border border-ink/10 px-3 py-2.5 text-ink tabular-nums focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
-                />
+                <div class="relative">
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    [appThousands]="draft.amount"
+                    (appThousandsChange)="onAmountChange(i, $event)"
+                    [disabled]="draft.skip"
+                    class="w-full rounded-xl bg-app border border-ink/10 pl-3 pr-11 py-2.5 text-ink tabular-nums focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+                  />
+                  <span class="absolute right-1.5 top-1/2 -translate-y-1/2">
+                    <app-calc-button
+                      [value]="draft.amount"
+                      [disabled]="draft.skip"
+                      (result)="onAmountChange(i, $event)" />
+                  </span>
+                </div>
               </label>
             </div>
 
@@ -357,6 +385,26 @@
                   [allowClear]="true"
                   [compact]="true" />
               </label>
+
+              @if (draft.type === 'expense' && owingAccountOptions().length > 0) {
+                <label class="flex flex-col gap-1.5">
+                  <span class="text-[11px] tracking-[0.18em] uppercase text-ink-muted font-semibold">
+                    Hutang ke akun
+                  </span>
+                  <app-searchable-select
+                    [options]="owingAccountPickerOptions()"
+                    [value]="draft.reservedFromAccountId ?? null"
+                    (valueChange)="onRowOwingPick(i, $event)"
+                    [disabled]="draft.skip"
+                    placeholder="Tanpa hutang"
+                    searchPlaceholder="Cari akun..."
+                    modalTitle="Akun penanggung"
+                    modalEyebrow="Hutang ke"
+                    emptyMessage="Akun tidak ditemukan."
+                    [allowClear]="true"
+                    [compact]="true" />
+                </label>
+              }
             } @else {
               <div class="flex flex-col gap-2 rounded-xl bg-chip-sky-bg/40 p-3">
                 <span class="text-[11px] tracking-[0.18em] uppercase text-chip-sky-ink font-semibold">

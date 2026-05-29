@@ -21,10 +21,12 @@ import {
   TransactionType,
 } from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
+import { ThousandsInputDirective } from '../../../shared/directives/thousands-input.directive';
 import {
   SearchableSelectComponent,
   SearchableSelectOption,
 } from '../../../shared/components/searchable-select/searchable-select.component';
+import { CalcButtonComponent } from '../../../shared/components/calc-button/calc-button.component';
 
 interface RincianRow {
   amount: number | null;
@@ -45,7 +47,14 @@ interface TypeOption {
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [IonContent, IonModal, CurrencyFormatPipe, SearchableSelectComponent],
+  imports: [
+    IonContent,
+    IonModal,
+    CurrencyFormatPipe,
+    ThousandsInputDirective,
+    SearchableSelectComponent,
+    CalcButtonComponent,
+  ],
   templateUrl: './transaction-form.page.html',
 })
 export class TransactionFormPage {

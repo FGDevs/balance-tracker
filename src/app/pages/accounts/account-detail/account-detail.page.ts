@@ -26,6 +26,7 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { AccountService } from '../../../core/services/account.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { GroupService } from '../../../core/services/group.service';
+import { SettlementService } from '../../../core/services/settlement.service';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { AccountType, ReservationEntry, Transaction } from '../../../core/models';
 import { CurrencyFormatPipe } from '../../../shared/pipes/currency-format.pipe';
@@ -65,6 +66,7 @@ interface DateGroup {
 export class AccountDetailPage {
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
+  private readonly settlementService = inject(SettlementService);
   private readonly auth = inject(AuthService);
   private readonly groups = inject(GroupService);
   private readonly router = inject(Router);
@@ -408,6 +410,67 @@ export class AccountDetailPage {
   onTransactionClick(id: number): void {
     if (this.reorderMode()) return; // chevrons own taps in reorder mode
     void this.router.navigate(['/transactions', id, 'edit']);
+  }
+
+  // A settlement-generated transfer leg. These must never be edited/deleted via
+  // the normal Transaction Form (it doesn't understand settlements) — tapping
+  // one offers to reverse the whole settlement instead (§7.4.3).
+  isSettlementTransfer(tx: Transaction): boolean {
+    return tx.type === 'transfer' && tx.settlement_transfer_id != null;
+  }
+
+  onMutasiRowClick(tx: Transaction): void {
+    if (this.reorderMode()) return;
+    if (this.isSettlementTransfer(tx)) {
+      this.openReverseConfirm(tx);
+      return;
+    }
+    void this.router.navigate(['/transactions', tx.id, 'edit']);
+  }
+
+  // ── reverse settlement ─────────────────────────────────────────────────────
+  readonly showReverseConfirm = signal(false);
+  readonly reversing = signal(false);
+  readonly reverseTarget = signal<Transaction | null>(null);
+
+  openReverseConfirm(tx: Transaction): void {
+    void Haptics.impact({ style: ImpactStyle.Medium });
+    this.reverseTarget.set(tx);
+    this.showReverseConfirm.set(true);
+  }
+
+  closeReverseConfirm(): void {
+    if (this.reversing()) return;
+    this.showReverseConfirm.set(false);
+    this.reverseTarget.set(null);
+  }
+
+  async onConfirmReverse(): Promise<void> {
+    const settlementId = this.reverseTarget()?.settlement_transfer_id;
+    if (settlementId == null) {
+      this.closeReverseConfirm();
+      return;
+    }
+    this.reversing.set(true);
+    this.errorMessage.set(null);
+    try {
+      await this.settlementService.reverseSettlement(settlementId);
+      await Haptics.notification({ type: NotificationType.Success });
+      this.showReverseConfirm.set(false);
+      this.reverseTarget.set(null);
+      await this.accountService.loadAllAccounts();
+      await Promise.all([
+        this.loadFirstPage(this.accountId()),
+        this.loadUnsettled(this.accountId()),
+      ]);
+    } catch (err) {
+      await Haptics.notification({ type: NotificationType.Error });
+      this.errorMessage.set(
+        err instanceof Error ? err.message : 'Gagal membatalkan pelunasan',
+      );
+    } finally {
+      this.reversing.set(false);
+    }
   }
 
   enterReorderMode(): void {

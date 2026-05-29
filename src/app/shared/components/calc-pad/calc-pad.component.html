@@ -1,0 +1,528 @@
+<!-- Screen + expression + result -->
+<div class="bg-card rounded-2xl shadow-card p-5">
+  <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Ekspresi</p>
+
+  <!-- Committed expression line: scrolls to its most-recent (right) end -->
+  <div #exprLine class="mt-3 overflow-x-auto">
+    <div class="flex items-baseline justify-end gap-1.5 whitespace-nowrap min-h-[1.25rem]">
+      @if (tokens().length === 0) {
+        <span class="text-sm text-ink-muted/40">&nbsp;</span>
+      } @else {
+        @for (tok of tokens(); track $index) {
+          @if (tok.kind === 'op') {
+            <span
+              class="font-display text-base"
+              [class.text-accent]="$index === tokens().length - 1"
+              [class.font-semibold]="$index === tokens().length - 1"
+              [class.text-ink-muted]="$index !== tokens().length - 1">
+              {{ opGlyph[tok.op] }}
+            </span>
+          } @else {
+            <span class="inline-flex flex-col items-end leading-tight">
+              <span
+                class="text-sm"
+                [class.text-chip-coral-ink]="tok.value < 0"
+                [class.text-ink-muted]="tok.value >= 0">
+                {{ tok.value | currencyFormat : currency() }}
+              </span>
+              @if (tok.source) {
+                <span class="text-[9px] tracking-wide text-chip-sky-ink">
+                  @if (tok.source.kind === 'tx') {
+                    {{ tok.source.date }} · {{ tok.source.accountName }}
+                  } @else if (tok.source.kind === 'debt') {
+                    {{ tok.source.owingName }} → {{ tok.source.creditorName }}
+                  } @else {
+                    {{ tok.source.accountName }} · saldo
+                  }
+                </span>
+              }
+            </span>
+          }
+        }
+      }
+    </div>
+  </div>
+
+  <!-- Editable screen: device keyboard or in-app keypad both write here -->
+  <input
+    type="text"
+    inputmode="numeric"
+    autocomplete="off"
+    enterkeyhint="done"
+    placeholder="0"
+    aria-label="Layar kalkulator"
+    [value]="screenValue()"
+    (input)="onScreenInput($event)"
+    (keydown)="onScreenKey($event)"
+    class="mt-1 w-full bg-transparent border-0 outline-none focus:outline-none focus:ring-0 p-0 text-right font-display text-[2.6rem] leading-tight tracking-tight caret-accent placeholder:text-ink-muted/30"
+    [class.text-chip-coral-ink]="(bufferNumber() ?? 0) < 0"
+    [class.text-ink]="(bufferNumber() ?? 0) >= 0" />
+
+  <!-- Source caption for an inserted operand (cleared on manual edit) -->
+  @if (bufferSource(); as src) {
+    <p class="text-right text-[10px] tracking-wide text-chip-sky-ink -mt-0.5">
+      @if (src.kind === 'tx') {
+        {{ src.date }} · {{ src.accountName }}
+      } @else if (src.kind === 'debt') {
+        {{ src.owingName }} → {{ src.creditorName }}
+      } @else {
+        {{ src.accountName }} · saldo
+      }
+    </p>
+  }
+
+  <!-- Live result -->
+  <div class="mt-4 pt-4 border-t border-ink/5 flex items-end justify-between gap-3">
+    <p class="text-[10px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Hasil</p>
+    @if (liveResult() != null) {
+      <p
+        class="font-display text-2xl leading-none"
+        [class.text-chip-green-ink]="(liveResult() ?? 0) > 0"
+        [class.text-chip-coral-ink]="(liveResult() ?? 0) < 0"
+        [class.text-ink]="(liveResult() ?? 0) === 0">
+        {{ liveResult() | currencyFormat : currency() }}
+      </p>
+    } @else {
+      <p class="font-display italic text-xl text-ink-muted">—</p>
+    }
+  </div>
+</div>
+
+<!-- Insert buttons -->
+<div class="mt-4 grid grid-cols-3 gap-2.5">
+  <button
+    type="button"
+    (click)="openPicker()"
+    class="inline-flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-ink/15 bg-card px-2 py-3 text-xs font-semibold text-ink active:scale-[0.98] transition">
+    <svg
+      class="w-4 h-4 text-accent shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+    Transaksi
+  </button>
+  <button
+    type="button"
+    (click)="openAccountPicker()"
+    class="inline-flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-ink/15 bg-card px-2 py-3 text-xs font-semibold text-ink active:scale-[0.98] transition">
+    <svg
+      class="w-4 h-4 text-accent shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round">
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+    Saldo
+  </button>
+  <button
+    type="button"
+    (click)="openDebtPicker()"
+    class="inline-flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-ink/15 bg-card px-2 py-3 text-xs font-semibold text-ink active:scale-[0.98] transition">
+    <svg
+      class="w-4 h-4 text-chip-coral-ink shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round">
+      <ellipse cx="12" cy="6" rx="8" ry="3" />
+      <path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6" />
+      <path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+    </svg>
+    Hutang
+  </button>
+</div>
+
+<!-- Keypad -->
+<div class="mt-5">
+  <div class="grid grid-cols-4 gap-2.5" (pointerdown)="onKeypadPointerDown($event)">
+    <button
+      type="button"
+      (click)="tapClear()"
+      class="col-span-2 rounded-2xl bg-chip-coral-bg text-chip-coral-ink font-semibold text-base py-4 active:scale-95 transition">
+      AC
+    </button>
+    <button
+      type="button"
+      (click)="tapBackspace()"
+      class="rounded-2xl bg-card text-ink font-semibold py-4 active:scale-95 transition inline-flex items-center justify-center">
+      <svg
+        class="w-5 h-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+        <line x1="18" y1="9" x2="12" y2="15" />
+        <line x1="12" y1="9" x2="18" y2="15" />
+      </svg>
+    </button>
+    <button
+      type="button"
+      (click)="tapOperator('/')"
+      class="rounded-2xl bg-accent/10 text-accent font-display text-2xl py-4 active:scale-95 transition">
+      ÷
+    </button>
+
+    <button type="button" (click)="tapDigit('7')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">7</button>
+    <button type="button" (click)="tapDigit('8')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">8</button>
+    <button type="button" (click)="tapDigit('9')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">9</button>
+    <button type="button" (click)="tapOperator('*')" class="rounded-2xl bg-accent/10 text-accent font-display text-2xl py-4 active:scale-95 transition">×</button>
+
+    <button type="button" (click)="tapDigit('4')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">4</button>
+    <button type="button" (click)="tapDigit('5')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">5</button>
+    <button type="button" (click)="tapDigit('6')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">6</button>
+    <button type="button" (click)="tapOperator('-')" class="rounded-2xl bg-accent/10 text-accent font-display text-2xl py-4 active:scale-95 transition">−</button>
+
+    <button type="button" (click)="tapDigit('1')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">1</button>
+    <button type="button" (click)="tapDigit('2')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">2</button>
+    <button type="button" (click)="tapDigit('3')" class="rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">3</button>
+    <button type="button" (click)="tapOperator('+')" class="rounded-2xl bg-accent/10 text-accent font-display text-2xl py-4 active:scale-95 transition">+</button>
+
+    <button type="button" (click)="tapDigit('0')" class="col-span-3 rounded-2xl bg-card text-ink font-display text-2xl py-4 active:scale-95 transition">0</button>
+    <button
+      type="button"
+      (click)="tapEquals()"
+      [disabled]="liveResult() == null"
+      class="rounded-2xl bg-accent text-on-dark font-display text-2xl py-4 active:scale-95 transition disabled:opacity-50">
+      =
+    </button>
+  </div>
+</div>
+
+<!-- Apply footer (modal use only) -->
+@if (showApply()) {
+  <div class="mt-4">
+    <button
+      type="button"
+      (click)="tapApply()"
+      [disabled]="liveResult() == null"
+      class="w-full rounded-2xl bg-accent text-on-dark font-semibold px-5 py-3.5 shadow-[0_2px_10px_-2px_rgba(217,122,60,0.45)] active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100 inline-flex items-center justify-center gap-2">
+      <svg
+        class="w-4 h-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M5 12l5 5L20 7" />
+      </svg>
+      <span>{{ applyLabel() }}</span>
+      @if (liveResult() != null) {
+        <span class="font-display text-base">·</span>
+        <span class="font-display text-base">
+          {{ liveResult() | currencyFormat : currency() }}
+        </span>
+      }
+    </button>
+  </div>
+}
+
+<!-- Tx picker modal -->
+<ion-modal
+  [isOpen]="pickerOpen()"
+  (didDismiss)="closePicker()"
+  [breakpoints]="[0, 0.6, 1]"
+  [initialBreakpoint]="1">
+  <ng-template>
+    <div class="bg-app font-sans h-full flex flex-col">
+      <header class="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span class="block h-px w-5 bg-accent"></span>
+            <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Sisipkan</p>
+          </div>
+          <h2 class="font-display text-2xl text-ink mt-2">Pilih transaksi.</h2>
+        </div>
+        <button
+          type="button"
+          (click)="closePicker()"
+          class="rounded-full w-9 h-9 inline-flex items-center justify-center text-ink-muted active:bg-ink/5 transition"
+          aria-label="Tutup">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="px-5 space-y-4 pb-3">
+        <div>
+          <p class="text-[10px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-2">Akun</p>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              (click)="pickAllAccounts()"
+              [class]="
+                isAllAccounts()
+                  ? 'rounded-full px-3 py-1 text-xs font-medium transition bg-ink text-on-dark'
+                  : 'rounded-full px-3 py-1 text-xs font-medium transition bg-card text-ink border border-ink/15'
+              ">
+              Semua
+            </button>
+            @for (a of accounts(); track a.id) {
+              <button
+                type="button"
+                (click)="toggleAccount(a.id)"
+                [class]="
+                  isAccountSelected(a.id)
+                    ? 'rounded-full px-3 py-1 text-xs font-medium transition truncate max-w-[8rem] bg-ink text-on-dark'
+                    : 'rounded-full px-3 py-1 text-xs font-medium transition truncate max-w-[8rem] bg-card text-ink border border-ink/15'
+                ">
+                {{ a.name }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div>
+          <p class="text-[10px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-2">Tanggal</p>
+          <div class="flex flex-wrap gap-1.5">
+            @for (p of presets; track p.value) {
+              <button
+                type="button"
+                (click)="pickPreset(p.value)"
+                [class]="
+                  datePreset() === p.value
+                    ? 'rounded-full px-3 py-1 text-xs font-medium transition bg-ink text-on-dark'
+                    : 'rounded-full px-3 py-1 text-xs font-medium transition bg-card text-ink border border-ink/15'
+                ">
+                {{ p.label }}
+              </button>
+            }
+          </div>
+          @if (datePreset() === 'custom') {
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <input
+                type="date"
+                [value]="dateFrom()"
+                (change)="onDateFromChange($any($event.target).value)"
+                class="rounded-xl bg-card border border-ink/10 px-2.5 py-2 text-sm text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+              <input
+                type="date"
+                [value]="dateTo()"
+                (change)="onDateToChange($any($event.target).value)"
+                class="rounded-xl bg-card border border-ink/10 px-2.5 py-2 text-sm text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+            </div>
+          }
+        </div>
+
+        <div>
+          <p class="text-[10px] tracking-[0.22em] uppercase text-ink-muted font-semibold mb-2">Pemilik</p>
+          <div class="flex flex-wrap gap-1.5">
+            @for (opt of scopeOptions; track opt.value) {
+              <button
+                type="button"
+                (click)="setScope(opt.value)"
+                [class]="
+                  scope() === opt.value
+                    ? 'rounded-full px-3 py-1 text-xs font-medium transition bg-ink text-on-dark'
+                    : 'rounded-full px-3 py-1 text-xs font-medium transition bg-card text-ink border border-ink/15'
+                ">
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+
+      @if (capReached()) {
+        <div class="px-5 pb-2">
+          <div class="bg-chip-amber-bg text-chip-amber-ink rounded-xl px-3 py-2 text-xs leading-snug flex items-start gap-2">
+            <span><span class="font-semibold">Dipotong 500.</span> Persempit filter.</span>
+          </div>
+        </div>
+      }
+
+      <div class="flex-1 overflow-y-auto px-5 pb-6">
+        @if (loadingTxs()) {
+          <div class="bg-card rounded-2xl shadow-card p-8 flex justify-center">
+            <span class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"></span>
+          </div>
+        } @else if (txError()) {
+          <p class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug">
+            {{ txError() }}
+          </p>
+        } @else if (transactions().length === 0) {
+          <div class="bg-card rounded-2xl shadow-card p-6 text-center">
+            <p class="font-display text-base text-ink">Tidak ada transaksi.</p>
+            <p class="text-sm text-ink-soft mt-1.5">Coba ubah filter di atas.</p>
+          </div>
+        } @else {
+          <div class="bg-card rounded-2xl shadow-card overflow-hidden">
+            @for (tx of transactions(); track tx.id) {
+              <button
+                type="button"
+                (click)="pickTransaction(tx)"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left border-b border-ink/5 last:border-b-0 active:bg-app/40 transition">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <p class="text-sm font-medium text-ink truncate">
+                      @if (tx.type === 'transfer') {
+                        Transfer
+                      } @else {
+                        {{ tx.category?.name ?? 'Tanpa kategori' }}
+                      }
+                    </p>
+                  </div>
+                  <p class="text-[11px] text-ink-muted mt-0.5 truncate">
+                    {{ tx.date }}@if (tx.account?.name) { · {{ tx.account?.name }} }
+                  </p>
+                </div>
+                <span
+                  class="shrink-0 font-display text-base"
+                  [class.text-chip-green-ink]="signedAmount(tx) >= 0"
+                  [class.text-chip-coral-ink]="signedAmount(tx) < 0">
+                  {{ signedAmount(tx) >= 0 ? '+' : '−' }}{{ tx.amount | currencyFormat : currency() }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<!-- Account balance picker modal -->
+<ion-modal
+  [isOpen]="accountPickerOpen()"
+  (didDismiss)="closeAccountPicker()"
+  [breakpoints]="[0, 0.5, 0.9]"
+  [initialBreakpoint]="0.9">
+  <ng-template>
+    <div class="bg-app font-sans h-full flex flex-col">
+      <header class="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span class="block h-px w-5 bg-accent"></span>
+            <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Sisipkan</p>
+          </div>
+          <h2 class="font-display text-2xl text-ink mt-2">Pilih saldo akun.</h2>
+        </div>
+        <button
+          type="button"
+          (click)="closeAccountPicker()"
+          class="rounded-full w-9 h-9 inline-flex items-center justify-center text-ink-muted active:bg-ink/5 transition"
+          aria-label="Tutup">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="flex-1 overflow-y-auto px-5 pb-6">
+        @if (accounts().length === 0) {
+          <div class="bg-card rounded-2xl shadow-card p-6 text-center">
+            <p class="font-display text-base text-ink">Belum ada akun.</p>
+          </div>
+        } @else {
+          <div class="bg-card rounded-2xl shadow-card overflow-hidden">
+            @for (acc of accounts(); track acc.id) {
+              <button
+                type="button"
+                (click)="pickAccountBalance(acc.id)"
+                class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-ink/5 last:border-b-0 active:bg-app/40 transition">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-ink truncate">{{ acc.name }}</p>
+                  <p class="text-[11px] text-ink-muted mt-0.5 uppercase tracking-wide">{{ acc.type }}</p>
+                </div>
+                <span
+                  class="shrink-0 font-display text-base"
+                  [class.text-chip-coral-ink]="acc.balance < 0"
+                  [class.text-ink]="acc.balance >= 0">
+                  {{ acc.balance | currencyFormat : currency() }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<!-- Debt picker modal -->
+<ion-modal
+  [isOpen]="debtPickerOpen()"
+  (didDismiss)="closeDebtPicker()"
+  [breakpoints]="[0, 0.5, 0.9]"
+  [initialBreakpoint]="0.9">
+  <ng-template>
+    <div class="bg-app font-sans h-full flex flex-col">
+      <header class="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span class="block h-px w-5 bg-accent"></span>
+            <p class="text-[11px] tracking-[0.22em] uppercase text-ink-muted font-semibold">Sisipkan</p>
+          </div>
+          <h2 class="font-display text-2xl text-ink mt-2">Pilih hutang.</h2>
+        </div>
+        <button
+          type="button"
+          (click)="closeDebtPicker()"
+          class="rounded-full w-9 h-9 inline-flex items-center justify-center text-ink-muted active:bg-ink/5 transition"
+          aria-label="Tutup">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="flex-1 overflow-y-auto px-5 pb-6">
+        @if (loadingPairs()) {
+          <div class="bg-card rounded-2xl shadow-card p-8 flex justify-center">
+            <span class="inline-block w-6 h-6 border-2 border-ink/15 border-t-accent rounded-full animate-spin"></span>
+          </div>
+        } @else if (pairsError()) {
+          <p class="rounded-xl bg-chip-coral-bg text-chip-coral-ink text-sm px-4 py-3 leading-snug">
+            {{ pairsError() }}
+          </p>
+        } @else if (reservationPairs().length === 0) {
+          <div class="bg-card rounded-2xl shadow-card p-6 text-center">
+            <p class="font-display text-base text-ink">Tidak ada hutang aktif.</p>
+          </div>
+        } @else {
+          <div class="bg-card rounded-2xl shadow-card overflow-hidden">
+            @for (pair of reservationPairs(); track pair.owing.id + '-' + pair.creditor.id) {
+              <button
+                type="button"
+                (click)="pickDebtPair(pair)"
+                class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-ink/5 last:border-b-0 active:bg-app/40 transition">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-ink truncate">
+                    {{ pair.owing.name }}
+                    <span class="text-ink-muted">→</span>
+                    {{ pair.creditor.name }}
+                  </p>
+                  <p class="text-[11px] text-ink-muted mt-0.5">
+                    {{ pair.count }} reservasi
+                  </p>
+                </div>
+                <span class="shrink-0 font-display text-base text-chip-coral-ink">
+                  {{ pair.totalReserved | currencyFormat : currency() }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

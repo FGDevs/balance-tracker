@@ -63,7 +63,9 @@ function buildPrompt(today: string, categories: Category[]): string {
     '',
     'ATURAN:',
     '- Tanggal: kembalikan dalam format YYYY-MM-DD. Resolusi "Hari ini" → hari ini, "Kemarin" → kemarin, dst.',
-    '    - Jika tanggal TIDAK terlihat / tidak dapat ditentukan dari screenshot, kembalikan null. JANGAN menebak atau memakai hari ini sebagai default.',
+    '    - Aplikasi perbankan SERING mengelompokkan transaksi di bawah header tanggal (mis. "Hari Ini", "Kemarin", "12 Mei 2026"). Setiap baris transaksi mewarisi tanggal dari header terakhir yang muncul SEBELUMNYA (di atasnya) pada screenshot.',
+    '    - Jika baris transaksi paling atas pada screenshot TIDAK didahului oleh header tanggal (gambar dipotong/scroll), HILANGKAN field "date" pada baris-baris awal tersebut (jangan sertakan field, bukan null, bukan string kosong). Hanya begitu user akan diminta memilih tanggal manual.',
+    '    - JANGAN menebak tanggal dan JANGAN memakai hari ini sebagai default jika tanggal benar-benar tidak terlihat.',
     '- Jumlah: angka positif (tanpa Rp atau pemisah ribuan).',
     '- Tipe:',
     '    - "transfer" jika baris adalah transfer antar bank/dompet (teks mengandung "Transfer", "TRF", "Kirim ke", "Terima dari", "Top up dari rekening", nama bank/dompet lain, dst).',
@@ -72,12 +74,12 @@ function buildPrompt(today: string, categories: Category[]): string {
     '- transferDirection (HANYA untuk type="transfer"):',
     '    - "out" jika uang KELUAR dari akun yang di-screenshot (debit/minus).',
     '    - "in"  jika uang MASUK ke akun yang di-screenshot (kredit/plus).',
-    '    - Jangan isi field ini untuk type lain.',
+    '    - Untuk type lain (income/expense): HILANGKAN field ini sepenuhnya (jangan sertakan, jangan null).',
     '- rawDescription: salin teks deskripsi/merchant verbatim dari screenshot.',
     '- note: bersihkan rawDescription menjadi catatan singkat yang mudah dibaca (contoh: "GOPAY/KOPI KENANGAN" → "Kopi Kenangan"; "TRF DR BCA 123" → "Transfer dari BCA"). Ini akan menjadi catatan transaksi yang disimpan; pengguna bisa mengeditnya.',
-    '- suggestedCategoryId: pilih id kategori terbaik dari daftar di bawah; JANGAN isi untuk type="transfer". Jika tidak ada yang cocok, hilangkan field.',
+    '- suggestedCategoryId: pilih id kategori terbaik dari daftar di bawah; HILANGKAN field untuk type="transfer" atau jika tidak ada yang cocok (jangan sertakan, jangan null).',
     '- JANGAN buat id kategori baru. JANGAN sertakan saldo/total — hanya baris transaksi individual.',
-    '- Lewati baris yang bukan transaksi (header, footer, "Saldo", "Total Mutasi", dll).',
+    '- Lewati baris yang bukan transaksi (header tanggal, header lain, footer, "Saldo", "Total Mutasi", dll). Header tanggal hanya dipakai untuk menentukan tanggal baris di bawahnya.',
     '',
     'Kategori pemasukan:',
     incomeCats.length ? incomeCats.map(fmt).join('\n') : '  (tidak ada)',
@@ -87,6 +89,13 @@ function buildPrompt(today: string, categories: Category[]): string {
   ].join('\n');
 }
 
+// `date`, `suggestedCategoryId`, `transferDirection` are intentionally NOT
+// declared `nullable: true`. Gemini structured-output has historically rejected
+// requests (HTTP 400) when an array's items mix concrete values with
+// `nullable+enum` fields — common when the first rows of a screenshot lack a
+// preceding date header. We instruct the model in the prompt to OMIT optional
+// fields entirely instead of emitting null, and accept absent fields when
+// parsing the response.
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -95,17 +104,13 @@ const RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          date: { type: 'STRING', nullable: true },
+          date: { type: 'STRING' },
           amount: { type: 'NUMBER' },
           type: { type: 'STRING', enum: ['income', 'expense', 'transfer'] },
           rawDescription: { type: 'STRING' },
           note: { type: 'STRING' },
-          suggestedCategoryId: { type: 'INTEGER', nullable: true },
-          transferDirection: {
-            type: 'STRING',
-            enum: ['in', 'out'],
-            nullable: true,
-          },
+          suggestedCategoryId: { type: 'INTEGER' },
+          transferDirection: { type: 'STRING', enum: ['in', 'out'] },
         },
         required: ['amount', 'type', 'rawDescription', 'note'],
       },
@@ -187,22 +192,31 @@ Deno.serve(async (req: Request) => {
   if (geminiResponse.status === 429) return errorResponse('quota_exceeded', 429);
   if (geminiResponse.status === 400) {
     const text = await geminiResponse.text();
+    console.error('Gemini 400:', text);
     if (/image|mime|inline_data/i.test(text)) {
       return errorResponse('unsupported_image');
     }
     return errorResponse('parse_failed');
   }
-  if (!geminiResponse.ok) return errorResponse('unknown', 502);
+  if (!geminiResponse.ok) {
+    const text = await geminiResponse.text().catch(() => '');
+    console.error('Gemini', geminiResponse.status, ':', text);
+    return errorResponse('unknown', 502);
+  }
 
   const geminiJson = await geminiResponse.json();
   const text: string | undefined =
     geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) return errorResponse('parse_failed');
+  if (!text) {
+    console.error('Gemini empty response:', JSON.stringify(geminiJson));
+    return errorResponse('parse_failed');
+  }
 
   let parsed: { drafts?: DraftOut[] };
   try {
     parsed = JSON.parse(text);
   } catch {
+    console.error('Gemini JSON parse failed; text was:', text);
     return errorResponse('parse_failed');
   }
 

@@ -119,11 +119,29 @@ getNearbyForImport(params: {
 ## SettlementService
 ```typescript
 settle(params: {
-  payerAccountId: number;          // lender / payee
+  payerAccountId: number;          // lender / creditor (payee)
   reservedFromAccountId: number;   // owing account
   paymentAmount: number;
   paymentDate: string;
+  viaAccountId?: number | null;    // optional conduit; if a distinct 3rd account,
+                                   // records owing→via→creditor (two legs). §7.4.2
 }): Promise<DebtSettlement>
+
+// Selection-driven (§7.4.1): caller passes exact entries; paymentAmount = SUM(entries).
+// No FIFO, no split. Same conduit option as settle().
+settleSelected(params: {
+  payerAccountId: number;
+  reservedFromAccountId: number;
+  entries: ReservationEntry[];
+  paymentDate: string;
+  viaAccountId?: number | null;    // §7.4.2
+}): Promise<DebtSettlement>
+
+// Fully undoes one settle()/settleSelected() call (§7.4.3): re-merges any partial
+// split, un-stamps every settled entry, reverses the money (owing += amount,
+// creditor -= amount), then deletes the transfer legs + the settlement row.
+// Client-orchestrated (not atomic). Reverse newest-first. Throws if not found.
+reverseSettlement(settlementId: number): Promise<void>
 
 // Returns preview without writing to DB — use in settlement UI.
 // Entries may be parent-kind or item-kind; the partial entry (if any) is whichever
